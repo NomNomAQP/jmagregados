@@ -55,7 +55,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                             <div className="w-5 h-5 border-2 border-white rounded-full"></div>
                         </div>
                         <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-primary-dark bg-clip-text text-transparent">
-                            Antigravity
+                            JM Agregados EIRL
                         </h1>
                     </div>
                     <button onClick={onClose} className="lg:hidden p-2 hover:bg-slate-50 rounded-xl">
@@ -97,10 +97,20 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                         <div className="absolute -right-4 -bottom-4 w-16 h-16 bg-primary/5 rounded-full group-hover:scale-150 transition-transform duration-700"></div>
                     </div>
 
-                    <button className="w-full flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-red-500 transition-colors">
+                    <button
+                        onClick={() => {
+                            localStorage.removeItem('antigravity_logged_user');
+                            localStorage.removeItem('antigravity_user_role');
+                            window.location.reload();
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-slate-500 hover:text-red-500 transition-colors"
+                    >
                         <LogOut size={20} />
                         <span className="font-medium">Cerrar Sesión</span>
                     </button>
+                    <div className="text-center pt-2">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Creado por Bryan Paz</p>
+                    </div>
                 </div>
             </div>
         </>
