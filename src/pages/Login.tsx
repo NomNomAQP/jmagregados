@@ -14,6 +14,7 @@ const Login = ({ onLogin }: LoginProps) => {
         e.preventDefault();
         setError('');
 
+        const savedUsers = localStorage.getItem('antigravity_users_list');
         const defaultUsers = [
             { id: '1', name: 'Bryan Portilla', username: 'admin', password: '123', role: 'ADMIN' },
             { id: '2', name: 'Juan Operador', username: 'operador', password: '123', role: 'OPERATOR' },
