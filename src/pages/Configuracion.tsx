@@ -6,6 +6,8 @@ interface User {
     name: string;
     role: 'ADMIN' | 'OPERATOR' | 'REPORTER';
     avatar: string;
+    username?: string;
+    password?: string;
 }
 
 const Configuracion = () => {
@@ -19,9 +21,9 @@ const Configuracion = () => {
             setUsers(JSON.parse(savedUsers));
         } else {
             const initialUsers: User[] = [
-                { id: '1', name: 'Bryan Portilla', role: 'ADMIN', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Bryan' },
-                { id: '2', name: 'Juan Operador', role: 'OPERATOR', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Juan' },
-                { id: '3', name: 'Maria Reportes', role: 'REPORTER', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Maria' },
+                { id: '1', name: 'Bryan Portilla', role: 'ADMIN', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Bryan', username: 'admin', password: '123' },
+                { id: '2', name: 'Juan Operador', role: 'OPERATOR', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Juan', username: 'operador', password: '123' },
+                { id: '3', name: 'Maria Reportes', role: 'REPORTER', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Maria', username: 'reporter', password: '123' },
             ];
             setUsers(initialUsers);
             localStorage.setItem('antigravity_users_list', JSON.stringify(initialUsers));

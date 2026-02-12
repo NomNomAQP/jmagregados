@@ -14,13 +14,20 @@ const Login = ({ onLogin }: LoginProps) => {
         e.preventDefault();
         setError('');
 
-        // Mock users logic
-        const savedUsers = localStorage.getItem('antigravity_users_list');
-        const users = savedUsers ? JSON.parse(savedUsers) : [
+        const defaultUsers = [
             { id: '1', name: 'Bryan Portilla', username: 'admin', password: '123', role: 'ADMIN' },
             { id: '2', name: 'Juan Operador', username: 'operador', password: '123', role: 'OPERATOR' },
             { id: '3', name: 'Maria Reportes', username: 'reporter', password: '123', role: 'REPORTER' },
         ];
+
+        let users = defaultUsers;
+        if (savedUsers) {
+            const parsed = JSON.parse(savedUsers);
+            // Si el primer usuario ya tiene username, usamos la lista del storage
+            if (parsed.length > 0 && parsed[0].username) {
+                users = parsed;
+            }
+        }
 
         const user = users.find((u: any) => u.username === username && u.password === password);
 
