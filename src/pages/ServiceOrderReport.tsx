@@ -28,6 +28,7 @@ const ServiceOrderReport = () => {
 
         if (savedOrders) {
             const parsed = JSON.parse(savedOrders) as Order[];
+            // Aseguramos que se vean todas las órdenes de servicio, sin importar el estado
             setOrders(parsed.filter(o => o.type === 'SERVICE'));
         }
 
