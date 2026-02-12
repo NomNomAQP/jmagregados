@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import type { Order, Voucher, Expense } from '../types';
 import { parseLimaDateString } from '../utils/dateUtils';
+import { INITIAL_ORDERS } from '../data/initialData';
 
 const Dashboard = () => {
     const [orders, setOrders] = useState<Order[]>([]);
@@ -30,7 +31,12 @@ const Dashboard = () => {
         const savedVouchers = localStorage.getItem('antigravity_vouchers');
         const savedExpenses = localStorage.getItem('antigravity_expenses');
 
-        if (savedOrders) setOrders(JSON.parse(savedOrders));
+        if (savedOrders) {
+            setOrders(JSON.parse(savedOrders));
+        } else {
+            setOrders(INITIAL_ORDERS);
+            localStorage.setItem('antigravity_orders', JSON.stringify(INITIAL_ORDERS));
+        }
         if (savedVouchers) setVouchers(JSON.parse(savedVouchers));
         if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
     }, []);
