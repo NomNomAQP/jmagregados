@@ -4,7 +4,7 @@ import {
     TrendingUp, Trash2, Hash, Edit3,
     Clock, Building2, Package, Save, Eye,
     ArrowLeft, CheckCircle2, AlertCircle, Calendar,
-    ClipboardList, ShoppingCart
+    ClipboardList, ShoppingCart, X
 } from 'lucide-react';
 import type { Order, OrderItem, Voucher } from '../types';
 import { getLimaDate, parseLimaDateString } from '../utils/dateUtils';
@@ -457,7 +457,7 @@ const AdminOrders = () => {
                                             {orderVouchers.length > 0 ? orderVouchers.map(v => {
                                                 const item = selectedOrder.items.find(i => i.id === v.itemId);
                                                 return (
-                                                    <tr key={v.id} className={`hover:bg-slate-50/50 transition-colors ${selectedVoucherIds.includes(v.id) ? 'bg-primary/5' : ''}`}>
+                                                    <tr key={v.id} className={`hover:bg-slate-50/50 transition-colors ${selectedVoucherIds.includes(v.id) ? 'bg-primary/5' : ''} ${editingVoucher?.id === v.id ? 'bg-amber-50/30' : ''}`}>
                                                         <td className="px-6 py-4">
                                                             <input
                                                                 type="checkbox"
@@ -466,10 +466,42 @@ const AdminOrders = () => {
                                                                 onChange={() => handleToggleSelectVoucher(v.id)}
                                                             />
                                                         </td>
-                                                        <td className="px-6 py-4 text-xs font-bold text-slate-600">{v.date}</td>
-                                                        <td className="px-6 py-4 text-xs font-black text-slate-800">{v.voucherNo}</td>
+                                                        <td className="px-6 py-4 text-xs font-bold text-slate-600">
+                                                            {editingVoucher?.id === v.id ? (
+                                                                <input
+                                                                    type="date"
+                                                                    className="w-full bg-white border-2 border-amber-200 rounded-lg p-1 text-[10px] outline-none focus:border-amber-400"
+                                                                    value={editingVoucher.date}
+                                                                    onChange={(e) => setEditingVoucher({ ...editingVoucher, date: e.target.value })}
+                                                                />
+                                                            ) : v.date}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-xs font-black text-slate-800">
+                                                            {editingVoucher?.id === v.id ? (
+                                                                <input
+                                                                    type="text"
+                                                                    className="w-full bg-white border-2 border-amber-200 rounded-lg p-1 text-[10px] outline-none focus:border-amber-400 font-black"
+                                                                    value={editingVoucher.voucherNo}
+                                                                    onChange={(e) => setEditingVoucher({ ...editingVoucher, voucherNo: e.target.value })}
+                                                                />
+                                                            ) : v.voucherNo}
+                                                        </td>
                                                         <td className="px-6 py-4 text-xs font-medium text-slate-500">{item?.description || '---'}</td>
-                                                        <td className="px-6 py-4 text-xs font-black text-slate-800 text-right">{v.quantity} {item?.unit}</td>
+                                                        <td className="px-6 py-4 text-xs font-black text-slate-800 text-right">
+                                                            {editingVoucher?.id === v.id ? (
+                                                                <div className="flex items-center justify-end gap-1">
+                                                                    <input
+                                                                        type="number"
+                                                                        className="w-16 bg-white border-2 border-amber-200 rounded-lg p-1 text-[10px] outline-none focus:border-amber-400 text-right font-black"
+                                                                        value={editingVoucher.quantity}
+                                                                        onChange={(e) => setEditingVoucher({ ...editingVoucher, quantity: parseFloat(e.target.value) || 0 })}
+                                                                    />
+                                                                    <span>{item?.unit}</span>
+                                                                </div>
+                                                            ) : (
+                                                                <>{v.quantity} {item?.unit}</>
+                                                            )}
+                                                        </td>
                                                         <td className="px-6 py-4">
                                                             <div className="flex items-center gap-2">
                                                                 <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500 border border-slate-200 uppercase">
@@ -487,13 +519,32 @@ const AdminOrders = () => {
                                                         </td>
                                                         <td className="px-6 py-4 text-right">
                                                             <div className="flex items-center justify-end gap-2">
-                                                                <button
-                                                                    onClick={() => setEditingVoucher(v)}
-                                                                    className="p-2 text-slate-300 hover:text-amber-500 transition-colors"
-                                                                    title="Editar Vale"
-                                                                >
-                                                                    <Edit3 size={16} />
-                                                                </button>
+                                                                {editingVoucher?.id === v.id ? (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={handleUpdateVoucher}
+                                                                            className="p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
+                                                                            title="Guardar"
+                                                                        >
+                                                                            <Save size={16} />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => setEditingVoucher(null)}
+                                                                            className="p-2 text-slate-400 hover:bg-slate-50 rounded-lg transition-colors"
+                                                                            title="Cancelar"
+                                                                        >
+                                                                            <X size={16} />
+                                                                        </button>
+                                                                    </>
+                                                                ) : (
+                                                                    <button
+                                                                        onClick={() => setEditingVoucher(v)}
+                                                                        className="p-2 text-slate-300 hover:text-amber-500 transition-colors"
+                                                                        title="Editar Vale"
+                                                                    >
+                                                                        <Edit3 size={16} />
+                                                                    </button>
+                                                                )}
                                                                 <button
                                                                     onClick={() => handleDeleteVoucher(v.id)}
                                                                     className="p-2 text-slate-300 hover:text-red-500 transition-colors"
@@ -961,66 +1012,6 @@ const AdminOrders = () => {
                 </div>
             )}
 
-            {/* Modal para Editar Vale */}
-            {editingVoucher && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300">
-                        <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
-                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                <Edit3 size={18} className="text-amber-500" />
-                                Editar Vale / Reporte
-                            </h3>
-                            <button onClick={() => setEditingVoucher(null)} className="p-2 hover:bg-white rounded-xl transition-colors text-slate-400">
-                                <AlertCircle size={20} className="rotate-45" />
-                            </button>
-                        </div>
-                        <div className="p-8 space-y-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Nro de Vale / Guía</label>
-                                <input
-                                    type="text"
-                                    className="input-field"
-                                    value={editingVoucher.voucherNo}
-                                    onChange={(e) => setEditingVoucher({ ...editingVoucher, voucherNo: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Fecha de Reporte</label>
-                                <input
-                                    type="date"
-                                    className="input-field"
-                                    value={editingVoucher.date}
-                                    onChange={(e) => setEditingVoucher({ ...editingVoucher, date: e.target.value })}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Cantidad Reportada</label>
-                                <input
-                                    type="number"
-                                    className="input-field font-bold text-primary"
-                                    value={editingVoucher.quantity}
-                                    onChange={(e) => setEditingVoucher({ ...editingVoucher, quantity: parseFloat(e.target.value) || 0 })}
-                                />
-                            </div>
-
-                            <div className="pt-4 flex gap-3">
-                                <button
-                                    onClick={() => setEditingVoucher(null)}
-                                    className="flex-1 py-3 px-4 rounded-2xl font-bold text-slate-500 hover:bg-slate-50 transition-all border border-slate-100"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    onClick={handleUpdateVoucher}
-                                    className="flex-1 py-3 px-4 rounded-2xl font-bold text-white bg-primary shadow-lg shadow-primary/20 hover:bg-primary-dark transition-all"
-                                >
-                                    Guardar Cambios
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };
