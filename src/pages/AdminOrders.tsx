@@ -16,6 +16,7 @@ const AdminOrders = () => {
     const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
     const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
     const [selectedVoucherIds, setSelectedVoucherIds] = useState<string[]>([]);
+    const [itemFilter, setItemFilter] = useState<string>('all');
 
     // List State
     const [orders, setOrders] = useState<Order[]>([]);
@@ -243,7 +244,10 @@ const AdminOrders = () => {
     // RENDER: ORDER DETAIL VIEW
     // --------------------------------------------------------------------------
     if (view === 'DETAIL' && selectedOrder) {
-        const orderVouchers = vouchers.filter(v => v.orderId === selectedOrder.id);
+        const orderVouchers = vouchers
+            .filter(v => v.orderId === selectedOrder.id)
+            .filter(v => itemFilter === 'all' || v.itemId === itemFilter)
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         return (
             <div className="space-y-8 pb-12 animate-in fade-in duration-500">
@@ -421,14 +425,29 @@ const AdminOrders = () => {
                                     <FileText size={18} className="text-primary" />
                                     Vales y Reportes de Campo
                                 </div>
-                                {selectedVoucherIds.length > 0 && (
-                                    <button
-                                        onClick={handleDeleteSelectedVouchers}
-                                        className="btn-secondary py-1.5 px-3 bg-red-50 text-red-600 border-red-100 hover:bg-red-100 flex items-center gap-2 text-xs"
-                                    >
-                                        <Trash2 size={14} /> Eliminar Seleccionados ({selectedVoucherIds.length})
-                                    </button>
-                                )}
+                                <div className="flex items-center gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <Filter size={14} className="text-slate-400" />
+                                        <select
+                                            className="text-xs font-bold bg-slate-50 border-none rounded-lg py-1.5 focus:ring-0 cursor-pointer text-slate-600"
+                                            value={itemFilter}
+                                            onChange={(e) => setItemFilter(e.target.value)}
+                                        >
+                                            <option value="all">Todos los materiales</option>
+                                            {selectedOrder.items.map(item => (
+                                                <option key={item.id} value={item.id}>{item.description}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    {selectedVoucherIds.length > 0 && (
+                                        <button
+                                            onClick={handleDeleteSelectedVouchers}
+                                            className="btn-secondary py-1.5 px-3 bg-red-50 text-red-600 border-red-100 hover:bg-red-100 flex items-center gap-2 text-xs"
+                                        >
+                                            <Trash2 size={14} /> Eliminar Seleccionados ({selectedVoucherIds.length})
+                                        </button>
+                                    )}
+                                </div>
                             </h3>
 
                             <div className="overflow-hidden border border-slate-100 rounded-2xl">
