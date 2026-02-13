@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     Plus, Search, Filter, MoreVertical, FileText,
     TrendingUp, Trash2, Hash, Edit3,
     Clock, Building2, Package, Save, Eye,
     ArrowLeft, CheckCircle2, AlertCircle, Calendar,
-    ClipboardList, ShoppingCart, X
+    ClipboardList, ShoppingCart, X, Activity
 } from 'lucide-react';
 import type { Order, OrderItem, Voucher } from '../types';
 import { getLimaDate, parseLimaDateString } from '../utils/dateUtils';
@@ -17,6 +17,7 @@ const AdminOrders = () => {
     const [editingVoucher, setEditingVoucher] = useState<Voucher | null>(null);
     const [selectedVoucherIds, setSelectedVoucherIds] = useState<string[]>([]);
     const [itemFilter, setItemFilter] = useState<string>('all');
+    const [expandedOrderIds, setExpandedOrderIds] = useState<string[]>([]);
 
     // List State
     const [orders, setOrders] = useState<Order[]>([]);
@@ -238,6 +239,20 @@ const AdminOrders = () => {
         setSelectedOrder(order);
         setView('DETAIL');
         setActiveMenuId(null);
+    };
+
+    const handleToggleStatus = (e: React.MouseEvent, order: Order) => {
+        e.stopPropagation();
+        const newStatus: Order['status'] = order.status === 'COMPLETED' ? 'IN_PROGRESS' : 'COMPLETED';
+        const updatedOrders = orders.map(o => o.id === order.id ? { ...o, status: newStatus } : o);
+        setOrders(updatedOrders);
+        localStorage.setItem('antigravity_orders', JSON.stringify(updatedOrders));
+    };
+
+    const toggleExpandOrder = (orderId: string) => {
+        setExpandedOrderIds(prev =>
+            prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
+        );
     };
 
     // --------------------------------------------------------------------------
@@ -731,80 +746,151 @@ const AdminOrders = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
-                                    {orders.map((order) => (
-                                        <tr key={order.id} className="hover:bg-slate-50/30 transition-colors group">
-                                            <td className="px-8 py-5">
-                                                <span className="font-bold text-slate-700">{order.orderNumber}</span>
-                                            </td>
-                                            <td className="px-8 py-5">
-                                                <span className={`px-2 py-1 rounded-lg text-[10px] font-black ${order.type === 'SERVICE' ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'}`}>
-                                                    {order.type === 'SERVICE' ? 'SERVICIO' : 'COMPRA'}
-                                                </span>
-                                            </td>
-                                            <td className="px-8 py-5 text-sm font-bold text-slate-600">{order.client}</td>
-                                            <td className="px-8 py-5 text-right font-black text-slate-800">S/ {order.totalAmount.toLocaleString()}</td>
-                                            <td className="px-8 py-5">
-                                                <div className="flex items-center gap-1.5 font-bold text-slate-500 text-sm">
-                                                    <Package size={14} /> {order.items.length} ítems
-                                                </div>
-                                            </td>
-                                            <td className="px-8 py-5">
-                                                {(() => {
-                                                    const orderVouchers = vouchers.filter(v => v.orderId === order.id);
-                                                    const totalDelivered = orderVouchers.reduce((sum, v) => sum + v.quantity, 0);
-                                                    const totalTarget = order.items.reduce((sum, i) => sum + i.quantity, 0);
-                                                    const progress = totalTarget > 0 ? Math.min((totalDelivered / totalTarget) * 100, 100) : 0;
+                                    {orders.map((order) => {
+                                        const orderVouchers = vouchers.filter(v => v.orderId === order.id);
+                                        const totalDelivered = orderVouchers.reduce((sum, v) => sum + v.quantity, 0);
+                                        const totalTarget = order.items.reduce((sum, i) => sum + i.quantity, 0);
+                                        const progress = totalTarget > 0 ? Math.min((totalDelivered / totalTarget) * 100, 100) : 0;
+                                        const isExpanded = expandedOrderIds.includes(order.id);
 
-                                                    return (
+                                        return (
+                                            <React.Fragment key={order.id}>
+                                                <tr
+                                                    onClick={() => toggleExpandOrder(order.id)}
+                                                    className="hover:bg-slate-50/30 transition-colors group cursor-pointer"
+                                                >
+                                                    <td className="px-8 py-5">
+                                                        <span className="font-bold text-slate-700">{order.orderNumber}</span>
+                                                    </td>
+                                                    <td className="px-8 py-5">
+                                                        <span className={`px-2 py-1 rounded-lg text-[10px] font-black ${order.type === 'SERVICE' ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'}`}>
+                                                            {order.type === 'SERVICE' ? 'SERVICIO' : 'COMPRA'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-8 py-5 text-sm font-bold text-slate-600">{order.client}</td>
+                                                    <td className="px-8 py-5 text-right font-black text-slate-800">S/ {order.totalAmount.toLocaleString()}</td>
+                                                    <td className="px-8 py-5">
+                                                        <div className="flex items-center gap-1.5 font-bold text-slate-500 text-sm">
+                                                            <Package size={14} /> {order.items.length} ítems
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-8 py-5">
                                                         <div className="flex items-center gap-3">
                                                             <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden min-w-[80px]">
                                                                 <div className="h-full bg-primary" style={{ width: `${progress}%` }}></div>
                                                             </div>
                                                             <span className="text-xs font-bold text-slate-500">{progress.toFixed(1)}%</span>
                                                         </div>
-                                                    );
-                                                })()}
-                                            </td>
-                                            <td className="px-8 py-5">
-                                                <span className="px-2 py-1 bg-green-50 text-green-600 rounded-lg text-[10px] font-black uppercase tracking-tight">Activo</span>
-                                            </td>
-                                            <td className="px-8 py-5 text-right relative">
-                                                <button
-                                                    onClick={() => setActiveMenuId(activeMenuId === order.id ? null : order.id)}
-                                                    className="p-2 text-slate-400 hover:text-primary transition-colors"
-                                                >
-                                                    <MoreVertical size={18} />
-                                                </button>
+                                                    </td>
+                                                    <td className="px-8 py-5">
+                                                        <button
+                                                            onClick={(e) => handleToggleStatus(e, order)}
+                                                            className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${order.status === 'COMPLETED'
+                                                                ? 'bg-slate-100 text-slate-400 hover:bg-slate-200'
+                                                                : 'bg-green-50 text-green-600 hover:bg-green-100 border border-green-100'
+                                                                }`}
+                                                        >
+                                                            {order.status === 'COMPLETED' ? 'Archivado' : 'Activo'}
+                                                        </button>
+                                                    </td>
+                                                    <td className="px-8 py-5 text-right relative">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setActiveMenuId(activeMenuId === order.id ? null : order.id);
+                                                            }}
+                                                            className="p-2 text-slate-400 hover:text-primary transition-colors"
+                                                        >
+                                                            <MoreVertical size={18} />
+                                                        </button>
 
-                                                {activeMenuId === order.id && (
-                                                    <div className="absolute right-12 top-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-50 w-48 animate-in zoom-in-95 duration-200">
-                                                        <button
-                                                            onClick={() => handleVisualize(order)}
-                                                            className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
-                                                        >
-                                                            <Eye size={16} className="text-primary" /> Visualizar Orden
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleEdit(order)}
-                                                            className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
-                                                        >
-                                                            <Edit3 size={16} className="text-amber-500" /> Editar Orden
-                                                        </button>
-                                                        <button className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors">
-                                                            <TrendingUp size={16} className="text-indigo-500" /> Ver Reportes
-                                                        </button>
-                                                        <div className="h-[1px] bg-slate-50 my-1"></div>
-                                                        <button
-                                                            onClick={() => handleDelete(order.id)}
-                                                            className="w-full px-4 py-2.5 text-left text-sm font-bold text-red-500 hover:bg-red-50 flex items-center gap-3 transition-colors"
-                                                        >
-                                                            <Trash2 size={16} /> Eliminar
-                                                        </button>
-                                                    </div>
+                                                        {activeMenuId === order.id && (
+                                                            <div className="absolute right-12 top-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-50 w-48 animate-in zoom-in-95 duration-200">
+                                                                <button
+                                                                    onClick={() => handleVisualize(order)}
+                                                                    className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                                                                >
+                                                                    <Eye size={16} className="text-primary" /> Visualizar Orden
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleEdit(order)}
+                                                                    className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                                                                >
+                                                                    <Edit3 size={16} className="text-amber-500" /> Editar Orden
+                                                                </button>
+                                                                <button className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors">
+                                                                    <TrendingUp size={16} className="text-indigo-500" /> Ver Reportes
+                                                                </button>
+                                                                <div className="h-[1px] bg-slate-50 my-1"></div>
+                                                                <button
+                                                                    onClick={() => handleDelete(order.id)}
+                                                                    className="w-full px-4 py-2.5 text-left text-sm font-bold text-red-500 hover:bg-red-50 flex items-center gap-3 transition-colors"
+                                                                >
+                                                                    <Trash2 size={16} /> Eliminar
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                                {isExpanded && (
+                                                    <tr className="bg-slate-50/50">
+                                                        <td colSpan={8} className="px-12 py-6">
+                                                            <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4 shadow-inner">
+                                                                <div className="flex items-center justify-between border-b border-slate-50 pb-4">
+                                                                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                                                                        <Activity size={14} className="text-primary" />
+                                                                        Resumen de Materiales / Servicios
+                                                                    </h4>
+                                                                    <span className="text-[10px] font-bold text-slate-400">Total ítems: {order.items.length}</span>
+                                                                </div>
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                    {order.items.map(item => {
+                                                                        const delivered = orderVouchers.filter(v => v.itemId === item.id).reduce((sum, v) => sum + v.quantity, 0);
+                                                                        const remaining = Math.max(0, item.quantity - delivered);
+                                                                        const excess = Math.max(0, delivered - item.quantity);
+                                                                        const itemProgress = Math.min((delivered / item.quantity) * 100, 100);
+
+                                                                        return (
+                                                                            <div key={item.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 space-y-3">
+                                                                                <div className="flex justify-between items-start">
+                                                                                    <p className="text-xs font-bold text-slate-700 line-clamp-1">{item.description}</p>
+                                                                                    {excess > 0 && (
+                                                                                        <span className="bg-red-50 text-red-600 px-2 py-0.5 rounded-lg text-[10px] font-black border border-red-100">
+                                                                                            EXCESO: +{excess} {item.unit}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                                <div className="grid grid-cols-3 gap-2">
+                                                                                    <div className="text-center">
+                                                                                        <p className="text-[9px] font-black text-slate-400 uppercase">Meta</p>
+                                                                                        <p className="text-xs font-bold text-slate-800">{item.quantity} {item.unit}</p>
+                                                                                    </div>
+                                                                                    <div className="text-center">
+                                                                                        <p className="text-[9px] font-black text-slate-400 uppercase">Entregado</p>
+                                                                                        <p className="text-xs font-bold text-primary">{delivered} {item.unit}</p>
+                                                                                    </div>
+                                                                                    <div className="text-center">
+                                                                                        <p className="text-[9px] font-black text-slate-400 uppercase">Falta</p>
+                                                                                        <p className="text-xs font-bold text-amber-600">{remaining} {item.unit}</p>
+                                                                                    </div>
+                                                                                </div>
+                                                                                <div className="h-1 bg-slate-200 rounded-full overflow-hidden">
+                                                                                    <div
+                                                                                        className={`h-full transition-all duration-1000 ${excess > 0 ? 'bg-red-500' : 'bg-primary'}`}
+                                                                                        style={{ width: `${itemProgress}%` }}
+                                                                                    ></div>
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
                                                 )}
-                                            </td>
-                                        </tr>
-                                    ))}
+                                            </React.Fragment>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
