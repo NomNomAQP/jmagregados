@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Shield, Database, Save, CheckCircle2, Users, AlertCircle, Eye, EyeOff, UserPlus, Trash2, X } from 'lucide-react';
+import { Shield, Database, Save, CheckCircle2, Users, AlertCircle, Eye, EyeOff, UserPlus, Trash2, X, CloudSync } from 'lucide-react';
+import { supabase } from '../utils/supabase';
 
 interface User {
     id: string;
@@ -18,6 +19,7 @@ const Configuracion = () => {
     const [editingUser, setEditingUser] = useState<User | null>(null);
     const [showPasswords, setShowPasswords] = useState<string[]>([]);
     const [isCreating, setIsCreating] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
     const [newUser, setNewUser] = useState({
         name: '',
         username: '',
@@ -26,26 +28,47 @@ const Configuracion = () => {
     });
 
     useEffect(() => {
-        // Cargar usuarios de localStorage o usar una lista por defecto si no hay
-        const savedUsers = localStorage.getItem('antigravity_users_list');
+        fetchUsers();
+
         const savedOrders = localStorage.getItem('antigravity_orders');
-
-        if (savedUsers) {
-            setUsers(JSON.parse(savedUsers));
-        } else {
-            const initialUsers: User[] = [
-                { id: '1', name: 'Bryan Portilla', role: 'ADMIN', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Bryan', username: 'admin', password: '123', assignedOrderIds: [] },
-                { id: '2', name: 'Juan Operador', role: 'OPERATOR', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Juan', username: 'operador', password: '123', assignedOrderIds: [] },
-                { id: '3', name: 'Maria Reportes', role: 'REPORTER', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Maria', username: 'reporter', password: '123', assignedOrderIds: [] },
-            ];
-            setUsers(initialUsers);
-            localStorage.setItem('antigravity_users_list', JSON.stringify(initialUsers));
-        }
-
         if (savedOrders) {
             setOrders(JSON.parse(savedOrders));
         }
     }, []);
+
+    const fetchUsers = async () => {
+        setIsSyncing(true);
+
+        // Intentar primero con Supabase
+        if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+            try {
+                const { data, error } = await supabase.from('users').select('*');
+                if (data && !error) {
+                    setUsers(data);
+                    localStorage.setItem('antigravity_users_list', JSON.stringify(data));
+                    setIsSyncing(false);
+                    return;
+                }
+            } catch (err) {
+                console.error("Supabase Fetch Error:", err);
+            }
+        }
+
+        // Respaldo en LocalStorage
+        const savedUsers = localStorage.getItem('antigravity_users_list');
+        if (savedUsers) {
+            setUsers(JSON.parse(savedUsers));
+        } else {
+            const initialUsers: User[] = [
+                { id: '1', name: 'Bryan Portilla', role: 'ADMIN', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Bryan', username: 'bryanp', password: 'idancelord', assignedOrderIds: [] },
+                { id: '2', name: 'Juan Operador', role: 'OPERATOR', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Juan', username: 'operador', password: '123', assignedOrderIds: [] },
+                { id: '3', name: 'Maria Reportes', username: 'reporter', password: '123', role: 'REPORTER', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Maria', assignedOrderIds: [] },
+            ];
+            setUsers(initialUsers);
+            localStorage.setItem('antigravity_users_list', JSON.stringify(initialUsers));
+        }
+        setIsSyncing(false);
+    };
 
     const handleRoleChange = (userId: string, newRole: User['role']) => {
         const updatedUsers = users.map((user: User) =>
@@ -60,7 +83,14 @@ const Configuracion = () => {
         );
     };
 
-    const handleCreateUser = () => {
+    const handlePasswordChange = (userId: string, newPassword: string) => {
+        const updatedUsers = users.map((user: User) =>
+            user.id === userId ? { ...user, password: newPassword } : user
+        );
+        setUsers(updatedUsers);
+    };
+
+    const handleCreateUser = async () => {
         if (!newUser.name || !newUser.username || !newUser.password) {
             alert('Por favor complete todos los campos');
             return;
@@ -69,12 +99,22 @@ const Configuracion = () => {
         const userToAdd: User = {
             id: Date.now().toString(),
             name: newUser.name,
-            username: newUser.username,
-            password: newUser.password,
+            username: newUser.username.trim().toLowerCase(),
+            password: newUser.password.trim(),
             role: newUser.role,
             avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${newUser.name}`,
             assignedOrderIds: []
         };
+
+        // Guardar en Supabase si está configurado
+        if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+            try {
+                const { error } = await supabase.from('users').insert([userToAdd]);
+                if (error) console.error("Supabase Save Error:", error);
+            } catch (err) {
+                console.error("Supabase Save Exception:", err);
+            }
+        }
 
         const updatedUsers = [...users, userToAdd];
         setUsers(updatedUsers);
@@ -86,12 +126,21 @@ const Configuracion = () => {
         setTimeout(() => setShowSuccess(false), 2000);
     };
 
-    const handleDeleteUser = (userId: string) => {
+    const handleDeleteUser = async (userId: string) => {
         if (userId === '1') {
             alert('No se puede eliminar al administrador principal');
             return;
         }
         if (confirm('¿Está seguro de eliminar este usuario?')) {
+            // Eliminar de Supabase si está configurado
+            if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+                try {
+                    await supabase.from('users').delete().eq('id', userId);
+                } catch (err) {
+                    console.error("Supabase Delete Error:", err);
+                }
+            }
+
             const updatedUsers = users.filter(u => u.id !== userId);
             setUsers(updatedUsers);
             localStorage.setItem('antigravity_users_list', JSON.stringify(updatedUsers));
@@ -170,6 +219,13 @@ const Configuracion = () => {
                             </div>
                             <div className="flex items-center gap-3">
                                 <button
+                                    onClick={fetchUsers}
+                                    className={`p-2.5 rounded-xl transition-all ${isSyncing ? 'animate-spin text-primary' : 'text-slate-400 hover:bg-slate-50'}`}
+                                    title="Sincronizar con Supabase"
+                                >
+                                    <CloudSync size={20} />
+                                </button>
+                                <button
                                     onClick={() => setIsCreating(true)}
                                     className="flex items-center gap-2 px-4 py-2.5 bg-primary/10 text-primary rounded-xl font-bold text-xs hover:bg-primary/20 transition-all"
                                 >
@@ -210,13 +266,16 @@ const Configuracion = () => {
                                                 <span className="text-xs font-bold text-slate-600 font-mono bg-slate-100 px-2 py-1 rounded-lg">{user.username || '---'}</span>
                                             </td>
                                             <td className="px-6 py-5">
-                                                <div className="flex items-center gap-2 group/pass">
-                                                    <span className="text-xs font-bold text-slate-800 font-mono">
-                                                        {showPasswords.includes(user.id) ? user.password : '••••••••'}
-                                                    </span>
+                                                <div className="flex items-center gap-2 group/pass max-w-[150px]">
+                                                    <input
+                                                        type={showPasswords.includes(user.id) ? "text" : "password"}
+                                                        value={user.password}
+                                                        onChange={(e) => handlePasswordChange(user.id, e.target.value)}
+                                                        className="bg-slate-100 border-none rounded-lg px-2 py-1 text-xs font-bold text-slate-800 font-mono w-full focus:ring-1 focus:ring-primary/30 outline-none"
+                                                    />
                                                     <button
                                                         onClick={() => togglePasswordVisibility(user.id)}
-                                                        className="p-1 text-slate-300 hover:text-primary transition-colors"
+                                                        className="p-1 text-slate-300 hover:text-primary transition-colors shrink-0"
                                                     >
                                                         {showPasswords.includes(user.id) ? <EyeOff size={14} /> : <Eye size={14} />}
                                                     </button>

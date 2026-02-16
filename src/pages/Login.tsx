@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Shield, User, Lock, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { supabase } from '../utils/supabase';
 
 interface LoginProps {
     onLogin: (userData: { name: string; role: string }) => void;
@@ -10,29 +11,70 @@ const Login = ({ onLogin }: LoginProps) => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
 
-    const handleLogin = (e: React.FormEvent) => {
+    useEffect(() => {
+        // Precargar usuarios de supabase al montar el login para asegurar sincronización
+        const syncUsers = async () => {
+            if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+                try {
+                    const { data, error } = await supabase.from('users').select('*');
+                    if (data && !error) {
+                        localStorage.setItem('antigravity_users_list', JSON.stringify(data));
+                    }
+                } catch (err) {
+                    console.error("Login Pre-sync error:", err);
+                }
+            }
+        };
+        syncUsers();
+    }, []);
+
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
 
+        // Intentar primero con Supabase si está configurado
+        if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+            try {
+                const { data: dbUsers, error: dbError } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('username', username.trim().toLowerCase())
+                    .eq('password', password.trim())
+                    .single();
+
+                if (dbUsers && !dbError) {
+                    localStorage.setItem('antigravity_logged_user', JSON.stringify({ name: dbUsers.name, role: dbUsers.role }));
+                    localStorage.setItem('antigravity_user_role', dbUsers.role);
+                    onLogin({ name: dbUsers.name, role: dbUsers.role });
+                    return;
+                }
+            } catch (err) {
+                console.error("Supabase Login Error:", err);
+            }
+        }
+
         const savedUsers = localStorage.getItem('antigravity_users_list');
         const defaultUsers = [
-            { id: '1', name: 'Bryan Portilla', username: 'admin', password: '123', role: 'ADMIN' },
+            { id: '1', name: 'Bryan Portilla', username: 'bryanp', password: 'idancelord', role: 'ADMIN' },
             { id: '2', name: 'Juan Operador', username: 'operador', password: '123', role: 'OPERATOR' },
             { id: '3', name: 'Maria Reportes', username: 'reporter', password: '123', role: 'REPORTER' },
         ];
 
         let users = defaultUsers;
         if (savedUsers) {
-            users = JSON.parse(savedUsers);
-            // Si por alguna razón la lista del storage es vieja y no tiene usernames, habilitar fallback
-            if (users.length > 0 && !users[0].username) {
-                users = defaultUsers;
+            try {
+                const parsed = JSON.parse(savedUsers);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    users = parsed;
+                }
+            } catch (err) {
+                console.error("Error parsing users", err);
             }
         }
 
         const user = users.find((u: any) =>
-            String(u.username || '').toLowerCase() === username.toLowerCase() &&
-            String(u.password || '') === password
+            String(u.username || '').toLowerCase().trim() === username.toLowerCase().trim() &&
+            String(u.password || '').trim() === password.trim()
         );
 
         if (user) {
