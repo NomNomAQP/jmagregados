@@ -86,7 +86,7 @@ const PurchaseOrderReport = () => {
         }
 
         const newVoucher: Voucher = {
-            id: Date.now().toString(),
+            id: crypto.randomUUID(),
             orderId: selectedOrderId,
             itemId: formData.itemId,
             date: formData.date,

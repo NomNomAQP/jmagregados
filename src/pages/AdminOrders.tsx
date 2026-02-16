@@ -112,20 +112,35 @@ const AdminOrders = () => {
                 if (localO) setOrders(JSON.parse(localO));
                 if (localV) setVouchers(JSON.parse(localV));
 
-                // 3. Sincronizar Nube
+                // 3. Sincronizar Nube con MERGE inteligente
                 if (supabase) {
                     const { data: dbO } = await supabase.from('orders').select('*');
                     const { data: dbV } = await supabase.from('vouchers').select('*');
 
                     if (dbO) {
-                        const mappedO = dbO.map(mapFromDb);
-                        setOrders(mappedO);
-                        localStorage.setItem('antigravity_orders', JSON.stringify(mappedO));
+                        const cloudOrders = dbO.map(mapFromDb);
+                        setOrders(prev => {
+                            // Union: Si el ID existe localmente, mantenemos el local (que podría tener cambios sin subir)
+                            // Pero para órdenes, el admin suele ser el único que las crea, 
+                            // así que una unión por ID es segura.
+                            const localIds = new Set(prev.map(o => o.id));
+                            const newCloudOrders = cloudOrders.filter(o => !localIds.has(o.id));
+                            const merged = [...prev, ...newCloudOrders];
+                            localStorage.setItem('antigravity_orders', JSON.stringify(merged));
+                            return merged;
+                        });
                     }
                     if (dbV) {
-                        const mappedV = dbV.map(mapFromDb);
-                        setVouchers(mappedV);
-                        localStorage.setItem('antigravity_vouchers', JSON.stringify(mappedV));
+                        const cloudVouchers = dbV.map(mapFromDb);
+                        setVouchers(prev => {
+                            // Unión de Vales: Muy importante para no perder reportes locales
+                            const localIds = new Set(prev.map(v => v.id));
+                            const newCloudVouchers = cloudVouchers.filter(v => !localIds.has(v.id));
+                            const merged = [...prev, ...newCloudVouchers];
+                            localStorage.setItem('antigravity_vouchers', JSON.stringify(merged));
+                            console.log(`Cloud Merge: +${newCloudVouchers.length} nuevos vales desde la nube.`);
+                            return merged;
+                        });
                     }
                 }
             } catch (err) {
@@ -164,7 +179,7 @@ const AdminOrders = () => {
                 return {
                     ...item,
                     deadlines: [...item.deadlines, {
-                        id: Date.now().toString(),
+                        id: crypto.randomUUID(),
                         deadlineNumber: item.deadlines.length + 1,
                         daysToComplete: 0,
                         quantity: 0,
@@ -235,7 +250,7 @@ const AdminOrders = () => {
             alert('Orden actualizada exitosamente');
         } else {
             finalOrder = {
-                id: Date.now().toString(),
+                id: crypto.randomUUID(),
                 orderNumber,
                 type: orderType,
                 client,
@@ -258,11 +273,15 @@ const AdminOrders = () => {
         setOrders(updatedOrders);
         localStorage.setItem('antigravity_orders', JSON.stringify(updatedOrders));
 
-        // Persistir en Supabase
+        // Persistir en Supabase (Con mapeo correcto)
         if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
             try {
-                const { error } = await supabase.from('orders').upsert(finalOrder!);
-                if (error) console.error("Cloud Save Error:", error);
+                const dbOrder = mapToDb(finalOrder!, 'orders');
+                const { error } = await supabase.from('orders').upsert(dbOrder);
+                if (error) {
+                    console.error("Cloud Save Error:", error);
+                    alert("Error al subir a la nube, pero se guardó localmente.");
+                }
             } catch (err) {
                 console.error("Cloud Exception:", err);
             }
@@ -371,8 +390,10 @@ const AdminOrders = () => {
             if (dbVouchers) {
                 const mapped = dbVouchers.map(mapFromDb);
                 setVouchers(prev => {
-                    const otherVouchers = prev.filter(v => v.orderId !== orderId);
-                    const merged = [...otherVouchers, ...mapped];
+                    // Merge por ID: Mantener locales y añadir nuevos de la nube
+                    const localIds = new Set(prev.map(v => v.id));
+                    const newFromCloud = mapped.filter(v => !localIds.has(v.id));
+                    const merged = [...prev, ...newFromCloud];
                     localStorage.setItem('antigravity_vouchers', JSON.stringify(merged));
                     return merged;
                 });
@@ -468,7 +489,7 @@ const AdminOrders = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {selectedOrder.items.map(item => {
                         const itemVouchers = orderVouchers.filter(v => v.itemId === item.id);
-                        const totalDelivered = itemVouchers.reduce((sum, v) => sum + v.quantity, 0);
+                        const totalDelivered = itemVouchers.reduce((sum, v) => sum + Number(v.quantity || 0), 0);
                         const progress = Math.min((totalDelivered / item.quantity) * 100, 100);
 
                         return (
@@ -511,7 +532,7 @@ const AdminOrders = () => {
                             <div className="space-y-8">
                                 {selectedOrder.items.map(item => {
                                     const itemVouchers = orderVouchers.filter(v => v.itemId === item.id);
-                                    const totalDelivered = itemVouchers.reduce((sum, v) => sum + v.quantity, 0);
+                                    const totalDelivered = itemVouchers.reduce((sum, v) => sum + Number(v.quantity || 0), 0);
                                     let cumulativeGoal = 0;
                                     let cumulativeDays = 0;
 
@@ -979,8 +1000,8 @@ const AdminOrders = () => {
 
                                         return filteredOrders.map((order) => {
                                             const orderVouchers = vouchers.filter(v => v.orderId === order.id);
-                                            const totalDelivered = orderVouchers.reduce((sum, v) => sum + v.quantity, 0);
-                                            const totalTarget = order.items.reduce((sum, i) => sum + i.quantity, 0);
+                                            const totalDelivered = orderVouchers.reduce((sum, v) => sum + Number(v.quantity || 0), 0);
+                                            const totalTarget = order.items.reduce((sum, i) => sum + Number(i.quantity || 0), 0);
                                             const progress = totalTarget > 0 ? Math.min((totalDelivered / totalTarget) * 100, 100) : 0;
                                             const isExpanded = expandedOrderIds.includes(order.id);
 
@@ -1099,7 +1120,7 @@ const AdminOrders = () => {
                                                                         </div>
                                                                         <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                                                                             {order.items.map(item => {
-                                                                                const delivered = orderVouchers.filter(v => v.itemId === item.id).reduce((sum, v) => sum + v.quantity, 0);
+                                                                                const delivered = orderVouchers.filter(v => v.itemId === item.id).reduce((sum, v) => sum + Number(v.quantity || 0), 0);
                                                                                 const itemProgress = Math.min((delivered / item.quantity) * 100, 100);
                                                                                 const isExceeded = delivered > item.quantity;
 

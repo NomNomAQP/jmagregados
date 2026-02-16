@@ -92,7 +92,7 @@ const ServiceOrderReport = () => {
         const quantity = parseFloat(formData.endMeter) - parseFloat(formData.startMeter);
 
         const newVoucher: Voucher = {
-            id: Date.now().toString(),
+            id: crypto.randomUUID(),
             orderId: selectedOrderId,
             itemId: formData.itemId,
             date: formData.date,
