@@ -93,18 +93,19 @@ const AdminOrders = () => {
                         localStorage.setItem('antigravity_orders', JSON.stringify(dbOrders));
                     }
 
-                    // Vouchers (Reforzar carga para externos)
-                    let vouchersQuery = supabase.from('vouchers').select('*');
-
-                    // Si es externo, intentar cargar específicamente sus órdenes para mayor probabilidad de éxito con RLS
-                    if (currentRole === 'EXTERNAL' && assignedIds.length > 0) {
-                        vouchersQuery = vouchersQuery.in('orderId', assignedIds);
-                    }
-
-                    const { data: dbVouchers } = await vouchersQuery;
-                    if (dbVouchers && dbVouchers.length > 0) {
-                        setVouchers(dbVouchers);
-                        localStorage.setItem('antigravity_vouchers', JSON.stringify(dbVouchers));
+                    // Vouchers (Sincronización robusta)
+                    const { data: dbVouchers } = await supabase.from('vouchers').select('*');
+                    if (dbVouchers) {
+                        if (dbVouchers.length > 0) {
+                            // Si hay datos en la nube, los usamos
+                            setVouchers(dbVouchers);
+                            localStorage.setItem('antigravity_vouchers', JSON.stringify(dbVouchers));
+                        } else {
+                            // Si la nube está vacía (posible error de permisos o tabla nueva), 
+                            // intentamos mantener lo que hay en localStorage para no quedar en blanco
+                            const localVouchers = localStorage.getItem('antigravity_vouchers');
+                            if (localVouchers) setVouchers(JSON.parse(localVouchers));
+                        }
                     }
 
                     // Gastos
