@@ -40,10 +40,41 @@ const AdminOrders = () => {
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
     useEffect(() => {
-        const loadAllData = async () => {
+        const syncAppData = async () => {
             setIsSyncing(true);
 
-            // 1. Cargar datos de LocalStorage (Inmediato)
+            // 1. Cargar Usuario y Roles Primero
+            const loggedUserStr = localStorage.getItem('antigravity_logged_user');
+            let currentRole = 'ADMIN';
+            let assignedIds: string[] = [];
+
+            if (loggedUserStr) {
+                const loggedUser = JSON.parse(loggedUserStr);
+                currentRole = loggedUser.role;
+                assignedIds = loggedUser.assignedOrderIds || [];
+
+                // Intentar refrescar perfil desde Supabase
+                if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+                    try {
+                        const { data: dbUser } = await supabase.from('users').select('*')
+                            .eq(loggedUser.id ? 'id' : 'name', loggedUser.id || loggedUser.name)
+                            .single();
+                        if (dbUser) {
+                            currentRole = dbUser.role;
+                            assignedIds = dbUser.assignedOrderIds || [];
+                            setCurrentUserRole(dbUser.role);
+                            setAssignedOrderIds(dbUser.assignedOrderIds || []);
+                            localStorage.setItem('antigravity_logged_user', JSON.stringify(dbUser));
+                            localStorage.setItem('antigravity_user_role', dbUser.role);
+                        }
+                    } catch (e) { console.error("Profile refresh error", e); }
+                } else {
+                    setCurrentUserRole(currentRole);
+                    setAssignedOrderIds(assignedIds);
+                }
+            }
+
+            // 2. Cargar datos locales (Inmediato para mejor UX)
             const savedOrders = localStorage.getItem('antigravity_orders');
             const savedVouchers = localStorage.getItem('antigravity_vouchers');
             const savedExpenses = localStorage.getItem('antigravity_expenses');
@@ -52,26 +83,33 @@ const AdminOrders = () => {
             if (savedVouchers) setVouchers(JSON.parse(savedVouchers));
             if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
 
-            // 2. Intentar Sincronizar con Supabase (Persistente)
+            // 3. Sincronizar con Nube
             if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
                 try {
-                    // Cargar Órdenes
-                    const { data: dbOrders, error: errO } = await supabase.from('orders').select('*');
-                    if (dbOrders && !errO) {
+                    // Órdenes
+                    const { data: dbOrders } = await supabase.from('orders').select('*');
+                    if (dbOrders && dbOrders.length > 0) {
                         setOrders(dbOrders);
                         localStorage.setItem('antigravity_orders', JSON.stringify(dbOrders));
                     }
 
-                    // Cargar Vales
-                    const { data: dbVouchers, error: errV } = await supabase.from('vouchers').select('*');
-                    if (dbVouchers && !errV) {
+                    // Vouchers (Reforzar carga para externos)
+                    let vouchersQuery = supabase.from('vouchers').select('*');
+
+                    // Si es externo, intentar cargar específicamente sus órdenes para mayor probabilidad de éxito con RLS
+                    if (currentRole === 'EXTERNAL' && assignedIds.length > 0) {
+                        vouchersQuery = vouchersQuery.in('orderId', assignedIds);
+                    }
+
+                    const { data: dbVouchers } = await vouchersQuery;
+                    if (dbVouchers && dbVouchers.length > 0) {
                         setVouchers(dbVouchers);
                         localStorage.setItem('antigravity_vouchers', JSON.stringify(dbVouchers));
                     }
 
-                    // Cargar Gastos
-                    const { data: dbExpenses, error: errE } = await supabase.from('expenses').select('*');
-                    if (dbExpenses && !errE) {
+                    // Gastos
+                    const { data: dbExpenses } = await supabase.from('expenses').select('*');
+                    if (dbExpenses && dbExpenses.length > 0) {
                         setExpenses(dbExpenses);
                         localStorage.setItem('antigravity_expenses', JSON.stringify(dbExpenses));
                     }
@@ -79,7 +117,6 @@ const AdminOrders = () => {
                     console.error("Cloud Sync Error:", err);
                 }
             } else if (!savedOrders) {
-                // Fallback a iniciales solo si no hay nada en ningún lado
                 setOrders(INITIAL_ORDERS);
                 localStorage.setItem('antigravity_orders', JSON.stringify(INITIAL_ORDERS));
             }
@@ -87,46 +124,7 @@ const AdminOrders = () => {
             setIsSyncing(false);
         };
 
-        const loadRoles = async () => {
-            const loggedUserStr = localStorage.getItem('antigravity_logged_user');
-            if (loggedUserStr) {
-                const loggedUser = JSON.parse(loggedUserStr);
-
-                // Intentar obtener info actualizada de Supabase
-                if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
-                    try {
-                        let query = supabase.from('users').select('*');
-
-                        // Si tenemos ID, lo usamos por precisión
-                        if (loggedUser.id) {
-                            query = query.eq('id', loggedUser.id);
-                        } else {
-                            // Fallback para sesiones antiguas sin ID
-                            query = query.eq('name', loggedUser.name);
-                        }
-
-                        const { data: dbUser } = await query.single();
-
-                        if (dbUser) {
-                            setCurrentUserRole(dbUser.role);
-                            setAssignedOrderIds(dbUser.assignedOrderIds || []);
-                            localStorage.setItem('antigravity_logged_user', JSON.stringify(dbUser));
-                            localStorage.setItem('antigravity_user_role', dbUser.role);
-                            return;
-                        }
-                    } catch (err) {
-                        console.error("Error fetching updated user role:", err);
-                    }
-                }
-
-                // Fallback a localStorage si falla la red o no hay Supabase
-                setCurrentUserRole(loggedUser.role);
-                setAssignedOrderIds(loggedUser.assignedOrderIds || []);
-            }
-        };
-
-        loadAllData();
-        loadRoles();
+        syncAppData();
     }, []);
 
     const handleAddItem = () => {
@@ -340,6 +338,7 @@ const AdminOrders = () => {
         setSelectedOrder(order);
         setView('DETAIL');
         setActiveMenuId(null);
+        fetchVouchersForOrder(order.id); // Carga forzada al entrar al detalle
     };
 
     const handleToggleStatus = (e: React.MouseEvent, order: Order) => {
@@ -350,10 +349,36 @@ const AdminOrders = () => {
         localStorage.setItem('antigravity_orders', JSON.stringify(updatedOrders));
     };
 
+    const fetchVouchersForOrder = async (orderId: string) => {
+        if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) return;
+
+        try {
+            const { data: dbVouchers } = await supabase
+                .from('vouchers')
+                .select('*')
+                .eq('orderId', orderId);
+
+            if (dbVouchers && dbVouchers.length > 0) {
+                setVouchers(prev => {
+                    const otherVouchers = prev.filter(v => v.orderId !== orderId);
+                    const merged = [...otherVouchers, ...dbVouchers];
+                    localStorage.setItem('antigravity_vouchers', JSON.stringify(merged));
+                    return merged;
+                });
+            }
+        } catch (err) {
+            console.error("Error fetching vouchers for order:", err);
+        }
+    };
+
     const toggleExpandOrder = (orderId: string) => {
-        setExpandedOrderIds(prev =>
-            prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
-        );
+        setExpandedOrderIds(prev => {
+            const isExpanding = !prev.includes(orderId);
+            if (isExpanding) {
+                fetchVouchersForOrder(orderId);
+            }
+            return isExpanding ? [...prev, orderId] : prev.filter(id => id !== orderId);
+        });
     };
 
     // --------------------------------------------------------------------------
