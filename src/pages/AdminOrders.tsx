@@ -944,26 +944,36 @@ const AdminOrders = () => {
                                                             </button>
                                                         </td>
                                                         <td className="px-8 py-5 text-right relative">
-                                                            <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setActiveMenuId(activeMenuId === order.id ? null : order.id);
-                                                                }}
-                                                                className="p-2 text-slate-400 hover:text-primary transition-colors"
-                                                            >
-                                                                <MoreVertical size={18} />
-                                                            </button>
-
-                                                            {activeMenuId === order.id && (
-                                                                <div className="absolute right-12 top-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-50 w-48 animate-in zoom-in-95 duration-200">
+                                                            {currentUserRole === 'EXTERNAL' ? (
+                                                                <button
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleVisualize(order);
+                                                                    }}
+                                                                    className="btn-primary py-2 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 w-full max-w-[120px] ml-auto"
+                                                                >
+                                                                    <Eye size={14} /> Ver Avance
+                                                                </button>
+                                                            ) : (
+                                                                <>
                                                                     <button
-                                                                        onClick={() => handleVisualize(order)}
-                                                                        className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setActiveMenuId(activeMenuId === order.id ? null : order.id);
+                                                                        }}
+                                                                        className="p-2 text-slate-400 hover:text-primary transition-colors"
                                                                     >
-                                                                        <Eye size={16} className="text-primary" /> Visualizar Orden
+                                                                        <MoreVertical size={18} />
                                                                     </button>
-                                                                    {currentUserRole !== 'EXTERNAL' && (
-                                                                        <>
+
+                                                                    {activeMenuId === order.id && (
+                                                                        <div className="absolute right-12 top-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-50 w-48 animate-in zoom-in-95 duration-200">
+                                                                            <button
+                                                                                onClick={() => handleVisualize(order)}
+                                                                                className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                                                                            >
+                                                                                <Eye size={16} className="text-primary" /> Visualizar Orden
+                                                                            </button>
                                                                             <button
                                                                                 onClick={() => handleEdit(order)}
                                                                                 className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
@@ -980,63 +990,101 @@ const AdminOrders = () => {
                                                                             >
                                                                                 <Trash2 size={16} /> Eliminar
                                                                             </button>
-                                                                        </>
+                                                                        </div>
                                                                     )}
-                                                                </div>
+                                                                </>
                                                             )}
                                                         </td>
                                                     </tr>
                                                     {isExpanded && (
                                                         <tr className="bg-slate-50/50">
                                                             <td colSpan={8} className="px-12 py-6">
-                                                                <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4 shadow-inner">
-                                                                    <div className="flex items-center justify-between border-b border-slate-50 pb-4">
-                                                                        <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                                                                            <Activity size={14} className="text-primary" />
-                                                                            Resumen de Materiales / Servicios
-                                                                        </h4>
-                                                                        <span className="text-[10px] font-bold text-slate-400">Total ítems: {order.items.length}</span>
-                                                                    </div>
-                                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                                        {order.items.map(item => {
-                                                                            const delivered = orderVouchers.filter(v => v.itemId === item.id).reduce((sum, v) => sum + v.quantity, 0);
-                                                                            const remaining = Math.max(0, item.quantity - delivered);
-                                                                            const excess = Math.max(0, delivered - item.quantity);
-                                                                            const itemProgress = Math.min((delivered / item.quantity) * 100, 100);
+                                                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                                                    {/* Resumen de Materiales */}
+                                                                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4 shadow-sm">
+                                                                        <div className="flex items-center justify-between border-b border-slate-50 pb-4">
+                                                                            <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                                                                                <Activity size={14} className="text-primary" />
+                                                                                Resumen de Avance
+                                                                            </h4>
+                                                                            <span className="text-[10px] font-bold text-slate-400">{order.items.length} ítems</span>
+                                                                        </div>
+                                                                        <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                                                            {order.items.map(item => {
+                                                                                const delivered = orderVouchers.filter(v => v.itemId === item.id).reduce((sum, v) => sum + v.quantity, 0);
+                                                                                const itemProgress = Math.min((delivered / item.quantity) * 100, 100);
+                                                                                const isExceeded = delivered > item.quantity;
 
-                                                                            return (
-                                                                                <div key={item.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 space-y-3">
-                                                                                    <div className="flex justify-between items-start">
-                                                                                        <p className="text-xs font-bold text-slate-700 line-clamp-1">{item.description}</p>
-                                                                                        {excess > 0 && (
-                                                                                            <span className="bg-red-50 text-red-600 px-2 py-0.5 rounded-lg text-[10px] font-black border border-red-100">
-                                                                                                EXCESO: +{excess} {item.unit}
+                                                                                return (
+                                                                                    <div key={item.id} className="p-3 rounded-xl border border-slate-100 bg-slate-50/30">
+                                                                                        <div className="flex justify-between items-center mb-2">
+                                                                                            <p className="text-[11px] font-bold text-slate-700 truncate max-w-[200px]">{item.description}</p>
+                                                                                            <span className={`text-[10px] font-black ${isExceeded ? 'text-red-500' : 'text-primary'}`}>
+                                                                                                {delivered} / {item.quantity} {item.unit}
                                                                                             </span>
-                                                                                        )}
-                                                                                    </div>
-                                                                                    <div className="grid grid-cols-3 gap-2">
-                                                                                        <div className="text-center">
-                                                                                            <p className="text-[9px] font-black text-slate-400 uppercase">Meta</p>
-                                                                                            <p className="text-xs font-bold text-slate-800">{item.quantity} {item.unit}</p>
                                                                                         </div>
-                                                                                        <div className="text-center">
-                                                                                            <p className="text-[9px] font-black text-slate-400 uppercase">Entregado</p>
-                                                                                            <p className="text-xs font-bold text-primary">{delivered} {item.unit}</p>
-                                                                                        </div>
-                                                                                        <div className="text-center">
-                                                                                            <p className="text-[9px] font-black text-slate-400 uppercase">Falta</p>
-                                                                                            <p className="text-xs font-bold text-amber-600">{remaining} {item.unit}</p>
+                                                                                        <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                                                                            <div
+                                                                                                className={`h-full ${isExceeded ? 'bg-red-500' : 'bg-primary'}`}
+                                                                                                style={{ width: `${itemProgress}%` }}
+                                                                                            ></div>
                                                                                         </div>
                                                                                     </div>
-                                                                                    <div className="h-1 bg-slate-200 rounded-full overflow-hidden">
-                                                                                        <div
-                                                                                            className={`h-full transition-all duration-1000 ${excess > 0 ? 'bg-red-500' : 'bg-primary'}`}
-                                                                                            style={{ width: `${itemProgress}%` }}
-                                                                                        ></div>
+                                                                                );
+                                                                            })}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Últimos Vales */}
+                                                                    <div className="bg-white rounded-2xl border border-slate-200 p-6 space-y-4 shadow-sm">
+                                                                        <div className="flex items-center justify-between border-b border-slate-50 pb-4">
+                                                                            <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                                                                                <FileText size={14} className="text-amber-500" />
+                                                                                Últimos Vales Reportados
+                                                                            </h4>
+                                                                            <button
+                                                                                onClick={(e) => { e.stopPropagation(); handleVisualize(order); }}
+                                                                                className="text-[10px] font-black text-primary hover:underline uppercase tracking-widest"
+                                                                            >
+                                                                                Ver todos
+                                                                            </button>
+                                                                        </div>
+                                                                        <div className="space-y-3">
+                                                                            {orderVouchers.length > 0 ? (
+                                                                                orderVouchers.slice(0, 4).map(v => (
+                                                                                    <div key={v.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 group/v">
+                                                                                        <div className="flex items-center gap-3">
+                                                                                            <div className="w-8 h-8 bg-slate-50 rounded-lg flex items-center justify-center text-slate-400 group-hover/v:bg-primary/5 group-hover/v:text-primary transition-colors">
+                                                                                                <Hash size={14} />
+                                                                                            </div>
+                                                                                            <div>
+                                                                                                <p className="text-[11px] font-bold text-slate-700">{v.voucherNo}</p>
+                                                                                                <p className="text-[9px] font-medium text-slate-400">{v.date}</p>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <div className="text-right">
+                                                                                            <p className="text-[11px] font-black text-slate-800">{v.quantity} {order.items.find(i => i.id === v.itemId)?.unit || ''}</p>
+                                                                                            <p className="text-[9px] font-medium text-slate-500">{v.reportedBy || 'Admin'}</p>
+                                                                                        </div>
                                                                                     </div>
+                                                                                ))
+                                                                            ) : (
+                                                                                <div className="h-full flex flex-col items-center justify-center py-10 text-slate-300">
+                                                                                    <AlertCircle size={24} className="mb-2 opacity-20" />
+                                                                                    <p className="text-[11px] font-bold">No hay vales registrados</p>
                                                                                 </div>
-                                                                            );
-                                                                        })}
+                                                                            )}
+                                                                        </div>
+                                                                        {orderVouchers.length > 0 && (
+                                                                            <div className="pt-2">
+                                                                                <button
+                                                                                    onClick={(e) => { e.stopPropagation(); handleVisualize(order); }}
+                                                                                    className="w-full py-2 bg-slate-50 hover:bg-slate-100 rounded-xl text-[10px] font-black text-slate-500 uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+                                                                                >
+                                                                                    <Eye size={14} /> Detalle Completo de Avance
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             </td>
