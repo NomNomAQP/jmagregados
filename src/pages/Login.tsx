@@ -58,6 +58,7 @@ const Login = ({ onLogin }: LoginProps) => {
             { id: '1', name: 'Bryan Portilla', username: 'bryanp', password: 'idancelord', role: 'ADMIN' },
             { id: '2', name: 'Juan Operador', username: 'operador', password: '123', role: 'OPERATOR' },
             { id: '3', name: 'Maria Reportes', username: 'reporter', password: '123', role: 'REPORTER' },
+            { id: '4', name: 'Supervisor JM', username: 'supervisor', password: '123', role: 'OBSERVER' },
         ];
 
         let users = defaultUsers;

@@ -930,7 +930,7 @@ const AdminOrders = () => {
                             {isSyncing ? 'Sincronizando...' : 'Sincronizar Nube'}
                         </button>
                     )}
-                    {currentUserRole !== 'EXTERNAL' && (
+                    {(currentUserRole === 'ADMIN') && (
                         <button
                             onClick={() => {
                                 if (view !== 'LIST') {
@@ -990,8 +990,9 @@ const AdminOrders = () => {
                                 <tbody className="divide-y divide-slate-50">
                                     {(() => {
                                         const filteredOrders = orders.filter(o =>
-                                            currentUserRole !== 'EXTERNAL' ||
-                                            (Array.isArray(assignedOrderIds) && assignedOrderIds.includes(o.id))
+                                            (currentUserRole !== 'EXTERNAL' && currentUserRole !== 'OBSERVER') ||
+                                            (currentUserRole === 'OBSERVER') ||
+                                            (currentUserRole === 'EXTERNAL' && Array.isArray(assignedOrderIds) && assignedOrderIds.includes(o.id))
                                         );
 
                                         if (filteredOrders.length === 0) {
@@ -1055,13 +1056,13 @@ const AdminOrders = () => {
                                                         <td className="px-8 py-5">
                                                             <button
                                                                 onClick={(e) => {
-                                                                    if (currentUserRole !== 'EXTERNAL') {
+                                                                    if (currentUserRole === 'ADMIN') {
                                                                         handleToggleStatus(e, order);
                                                                     } else {
                                                                         e.stopPropagation();
                                                                     }
                                                                 }}
-                                                                disabled={currentUserRole === 'EXTERNAL'}
+                                                                disabled={currentUserRole !== 'ADMIN'}
                                                                 className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${order.status === 'COMPLETED'
                                                                     ? 'bg-slate-100 text-slate-400 hover:bg-slate-200'
                                                                     : 'bg-green-50 text-green-600 hover:bg-green-100 border border-green-100'
@@ -1071,7 +1072,7 @@ const AdminOrders = () => {
                                                             </button>
                                                         </td>
                                                         <td className="px-8 py-5 text-right relative">
-                                                            {currentUserRole === 'EXTERNAL' ? (
+                                                            {(currentUserRole === 'EXTERNAL' || currentUserRole === 'OBSERVER') ? (
                                                                 <button
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
