@@ -423,7 +423,7 @@ const AdminOrders = () => {
                 if (errO) throw errO;
             }
 
-            // 2. Sincronizar Vales (Limpieza estricta de campos)
+            // 2. Sincronizar Vales (Limpieza ULTRA estricta para evitar errores de esquema)
             if (vouchers.length > 0) {
                 const cleanVouchers = vouchers.map(v => ({
                     id: v.id,
@@ -434,10 +434,9 @@ const AdminOrders = () => {
                     voucherNo: v.voucherNo,
                     type: v.type,
                     reportedBy: v.reportedBy,
-                    photoUrl: v.photoUrl,
-                    activity: v.activity,
-                    startMeter: v.startMeter,
-                    endMeter: v.endMeter
+                    photoUrl: v.photoUrl
+                    // Eliminamos campos técnicos (activity, startMeter, endMeter) 
+                    // que están causando errores de 'column not found' en Supabase
                 }));
                 const { error: errV } = await supabase.from('vouchers').upsert(cleanVouchers);
                 if (errV) throw errV;
