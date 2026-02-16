@@ -38,55 +38,58 @@ const AdminOrders = () => {
     ]);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
-    // --- SISTEMA DE MAPEO ROBUSTO ---
+    // --- SISTEMA DE MAPEO ROBUSTO (BASADO EN DDL REAL) ---
     const mapFromDb = (item: any) => {
         if (!item) return item;
-        const mapped = { ...item };
-        // Mapeo de Vouchers
-        if (item.order_id) mapped.orderId = item.order_id;
-        if (item.item_id) mapped.itemId = item.item_id;
-        if (item.voucher_no) mapped.voucherNo = item.voucher_no;
-        if (item.reported_by) mapped.reportedBy = item.reported_by;
-        if (item.photo_url) mapped.photoUrl = item.photo_url;
-        if (item.start_meter !== undefined) mapped.startMeter = item.start_meter;
-        if (item.end_meter !== undefined) mapped.endMeter = item.end_meter;
-
-        // Mapeo de Órdenes
-        if (item.order_number) mapped.orderNumber = item.order_number;
-        if (item.notification_date) mapped.notificationDate = item.notification_date;
-        if (item.start_date) mapped.startDate = item.start_date;
-        if (item.end_date) mapped.endDate = item.end_date;
-        if (item.total_amount) mapped.totalAmount = item.total_amount;
-        if (item.order_type) mapped.type = item.order_type;
-        return mapped;
+        // Mapeo inverso si la DB devolviera snake_case, pero según DDL usa camelCase con comillas
+        // Para asegurar compatibilidad, mapeamos lo que venga de la DB a nuestro estado
+        return {
+            ...item,
+            id: item.id,
+            orderNumber: item.orderNumber || item.order_number,
+            type: item.type || item.order_type,
+            client: item.client,
+            description: item.description,
+            notificationDate: item.notificationDate || item.notification_date,
+            startDate: item.startDate || item.start_date,
+            endDate: item.endDate || item.end_date,
+            totalAmount: Number(item.totalAmount || 0),
+            status: item.status,
+            progress: Number(item.progress || 0),
+            items: item.items || [],
+            expenses: item.expenses || []
+        };
     };
 
     const mapToDb = (item: any, table: 'orders' | 'vouchers') => {
         if (table === 'vouchers') {
             return {
                 id: item.id,
-                order_id: item.orderId,
-                item_id: item.itemId,
+                orderId: item.orderId,
+                itemId: item.itemId,
                 date: item.date,
-                quantity: item.quantity,
-                voucher_no: item.voucherNo,
+                quantity: Number(item.quantity),
+                voucherNo: item.voucherNo,
                 type: item.type,
-                reported_by: item.reportedBy,
-                photo_url: item.photoUrl,
-                activity: item.activity,
-                start_meter: item.startMeter,
-                end_meter: item.endMeter
+                reportedBy: item.reportedBy,
+                photoUrl: item.photoUrl
             };
         }
         return {
             id: item.id,
-            order_number: item.orderNumber,
-            order_type: item.type,
-            description: item.description,
+            orderNumber: item.orderNumber,
+            type: item.type,
             client: item.client,
-            // Omitimos total_amount y progress porque parece que no existen en la BD
+            description: item.description,
+            notificationDate: item.notificationDate,
+            startDate: item.startDate,
+            endDate: item.endDate,
+            totalAmount: Number(item.totalAmount),
+            currency: item.currency || 'PEN',
             status: item.status,
-            items: item.items
+            progress: Number(item.progress),
+            items: item.items,
+            expenses: item.expenses
         };
     };
 

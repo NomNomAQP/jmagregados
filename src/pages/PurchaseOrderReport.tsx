@@ -107,14 +107,14 @@ const PurchaseOrderReport = () => {
             try {
                 const { error } = await supabase.from('vouchers').upsert({
                     id: newVoucher.id,
-                    order_id: newVoucher.orderId,
-                    item_id: newVoucher.itemId,
+                    orderId: newVoucher.orderId,
+                    itemId: newVoucher.itemId,
                     date: newVoucher.date,
                     quantity: newVoucher.quantity,
-                    voucher_no: newVoucher.voucherNo,
+                    voucherNo: newVoucher.voucherNo,
                     type: newVoucher.type,
-                    reported_by: newVoucher.reportedBy,
-                    photo_url: newVoucher.photoUrl
+                    reportedBy: newVoucher.reportedBy,
+                    photoUrl: newVoucher.photoUrl
                 });
                 if (error) console.warn("Aviso: Guardado local, pero error al subir a nube.", error);
             } catch (err) {
