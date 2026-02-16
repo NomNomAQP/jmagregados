@@ -20,6 +20,7 @@ import {
 import type { Order, Voucher, Expense } from '../types';
 import { parseLimaDateString } from '../utils/dateUtils';
 import { INITIAL_ORDERS } from '../data/initialData';
+import { supabase } from '../utils/supabase';
 
 const Dashboard = () => {
     const [orders, setOrders] = useState<Order[]>([]);
@@ -27,18 +28,45 @@ const Dashboard = () => {
     const [expenses, setExpenses] = useState<Expense[]>([]);
 
     useEffect(() => {
-        const savedOrders = localStorage.getItem('antigravity_orders');
-        const savedVouchers = localStorage.getItem('antigravity_vouchers');
-        const savedExpenses = localStorage.getItem('antigravity_expenses');
+        const loadDashboardData = async () => {
+            // 1. Carga rápida de LocalStorage
+            const savedOrders = localStorage.getItem('antigravity_orders');
+            const savedVouchers = localStorage.getItem('antigravity_vouchers');
+            const savedExpenses = localStorage.getItem('antigravity_expenses');
 
-        if (savedOrders) {
-            setOrders(JSON.parse(savedOrders));
-        } else {
-            setOrders(INITIAL_ORDERS);
-            localStorage.setItem('antigravity_orders', JSON.stringify(INITIAL_ORDERS));
-        }
-        if (savedVouchers) setVouchers(JSON.parse(savedVouchers));
-        if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
+            if (savedOrders) setOrders(JSON.parse(savedOrders));
+            else setOrders(INITIAL_ORDERS);
+
+            if (savedVouchers) setVouchers(JSON.parse(savedVouchers));
+            if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
+
+            // 2. Sincronización oficial con Supabase
+            if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+                try {
+                    const { data: dbOrders } = await supabase.from('orders').select('*');
+                    if (dbOrders) {
+                        setOrders(dbOrders);
+                        localStorage.setItem('antigravity_orders', JSON.stringify(dbOrders));
+                    }
+
+                    const { data: dbVouchers } = await supabase.from('vouchers').select('*');
+                    if (dbVouchers) {
+                        setVouchers(dbVouchers);
+                        localStorage.setItem('antigravity_vouchers', JSON.stringify(dbVouchers));
+                    }
+
+                    const { data: dbExpenses } = await supabase.from('expenses').select('*');
+                    if (dbExpenses) {
+                        setExpenses(dbExpenses);
+                        localStorage.setItem('antigravity_expenses', JSON.stringify(dbExpenses));
+                    }
+                } catch (err) {
+                    console.error("Dashboard Sync Error:", err);
+                }
+            }
+        };
+
+        loadDashboardData();
     }, []);
 
     // --- Data Calculations ---

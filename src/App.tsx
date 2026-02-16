@@ -40,13 +40,13 @@ function App() {
       ) : (
         <Layout>
           <Routes>
-            <Route path="/" element={currentRole === 'EXTERNAL' ? <Navigate to="/reportes" replace /> : <Dashboard />} />
+            <Route path="/" element={currentRole === 'EXTERNAL' ? <Navigate to="/ordenes" replace /> : <Dashboard />} />
             <Route path="/servicios" element={<ServiceOrderReport />} />
             <Route path="/compras" element={<PurchaseOrderReport />} />
-            <Route path="/reportes" element={<AdminOrders />} />
-            <Route path="/gastos" element={currentRole === 'ADMIN' ? <Expenses /> : <Navigate to="/reportes" replace />} />
-            <Route path="/equipo" element={currentRole === 'ADMIN' ? <div className="premium-card p-12 text-center text-slate-400 font-bold">Gestión de Personal - Próximamente</div> : <Navigate to="/reportes" replace />} />
-            <Route path="/configuracion" element={currentRole === 'ADMIN' ? <Configuracion /> : <Navigate to="/reportes" replace />} />
+            <Route path="/ordenes" element={<AdminOrders />} />
+            <Route path="/gastos" element={currentRole === 'ADMIN' ? <Expenses /> : <Navigate to="/ordenes" replace />} />
+            <Route path="/equipo" element={currentRole === 'ADMIN' ? <div className="premium-card p-12 text-center text-slate-400 font-bold">Gestión de Personal - Próximamente</div> : <Navigate to="/ordenes" replace />} />
+            <Route path="/configuracion" element={currentRole === 'ADMIN' ? <Configuracion /> : <Navigate to="/ordenes" replace />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
