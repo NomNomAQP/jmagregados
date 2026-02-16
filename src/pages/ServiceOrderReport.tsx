@@ -106,6 +106,29 @@ const ServiceOrderReport = () => {
         localStorage.setItem('antigravity_vouchers', JSON.stringify(updatedVouchers));
         setVouchers(updatedVouchers);
 
+        // --- NUEVO: Sincronización Automática con la Nube ---
+        const syncToCloud = async () => {
+            const { supabase } = await import('../utils/supabase');
+            try {
+                // Solo enviamos campos básicos para evitar errores de esquema
+                const { error } = await supabase.from('vouchers').upsert({
+                    id: newVoucher.id,
+                    orderId: newVoucher.orderId,
+                    itemId: newVoucher.itemId,
+                    date: newVoucher.date,
+                    quantity: newVoucher.quantity,
+                    voucherNo: newVoucher.voucherNo,
+                    type: newVoucher.type,
+                    reportedBy: newVoucher.reportedBy,
+                    photoUrl: newVoucher.photoUrl
+                });
+                if (error) console.warn("Aviso: No se pudo subir a la nube, pero se guardó localmente.", error);
+            } catch (err) {
+                console.error("Error de conexión con la nube:", err);
+            }
+        };
+        syncToCloud();
+
         alert('Reporte de servicio guardado exitosamente.');
 
         // Reset

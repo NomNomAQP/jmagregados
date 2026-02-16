@@ -120,6 +120,8 @@ const AdminOrders = () => {
                     const { data: dbVouchers } = await supabase.from('vouchers').select('*');
                     if (dbVouchers) {
                         const mappedVouchers = mapData(dbVouchers);
+                        console.log(`Cloud Sync: ${dbVouchers.length} vouchers fetched.`);
+
                         if (mappedVouchers.length > 0) {
                             setVouchers(mappedVouchers);
                             localStorage.setItem('antigravity_vouchers', JSON.stringify(mappedVouchers));
