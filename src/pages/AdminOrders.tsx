@@ -378,15 +378,30 @@ const AdminOrders = () => {
         if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) return;
 
         try {
-            const { data: dbVouchers } = await supabase
+            // Consultamos usando 'order_id' que es el nombre real en la DB
+            const { data: dbVouchers, error } = await supabase
                 .from('vouchers')
                 .select('*')
-                .eq('orderId', orderId);
+                .eq('order_id', orderId);
+
+            if (error) throw error;
 
             if (dbVouchers && dbVouchers.length > 0) {
+                // Mapeo manual para asegurar compatibilidad con el resto del código
+                const mapped = dbVouchers.map(v => ({
+                    ...v,
+                    orderId: v.order_id || v.orderId,
+                    itemId: v.item_id || v.itemId,
+                    voucherNo: v.voucher_no || v.voucherNo,
+                    reportedBy: v.reported_by || v.reportedBy,
+                    photoUrl: v.photo_url || v.photoUrl,
+                    startMeter: v.start_meter || v.startMeter,
+                    endMeter: v.end_meter || v.endMeter
+                }));
+
                 setVouchers(prev => {
                     const otherVouchers = prev.filter(v => v.orderId !== orderId);
-                    const merged = [...otherVouchers, ...dbVouchers];
+                    const merged = [...otherVouchers, ...mapped];
                     localStorage.setItem('antigravity_vouchers', JSON.stringify(merged));
                     return merged;
                 });

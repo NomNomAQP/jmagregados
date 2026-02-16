@@ -40,9 +40,9 @@ function App() {
       ) : (
         <Layout>
           <Routes>
-            <Route path="/" element={currentRole === 'EXTERNAL' ? <Navigate to="/ordenes" replace /> : <Dashboard />} />
-            <Route path="/servicios" element={currentRole === 'EXTERNAL' ? <Navigate to="/ordenes" replace /> : <ServiceOrderReport />} />
-            <Route path="/compras" element={currentRole === 'EXTERNAL' ? <Navigate to="/ordenes" replace /> : <PurchaseOrderReport />} />
+            <Route path="/" element={(currentRole === 'EXTERNAL' || currentRole === 'OBSERVER') ? <Navigate to="/ordenes" replace /> : <Dashboard />} />
+            <Route path="/servicios" element={(currentRole === 'EXTERNAL' || currentRole === 'OBSERVER') ? <Navigate to="/ordenes" replace /> : <ServiceOrderReport />} />
+            <Route path="/compras" element={(currentRole === 'EXTERNAL' || currentRole === 'OBSERVER') ? <Navigate to="/ordenes" replace /> : <PurchaseOrderReport />} />
             <Route path="/ordenes" element={<AdminOrders />} />
             <Route path="/gastos" element={currentRole === 'ADMIN' ? <Expenses /> : <Navigate to="/ordenes" replace />} />
             <Route path="/equipo" element={currentRole === 'ADMIN' ? <div className="premium-card p-12 text-center text-slate-400 font-bold">Gestión de Personal - Próximamente</div> : <Navigate to="/ordenes" replace />} />
