@@ -8,6 +8,7 @@ const PurchaseOrderReport = () => {
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
     const [selectedOrderId, setSelectedOrderId] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [userRole, setUserRole] = useState<string>('');
 
     const [formData, setFormData] = useState({
         orderId: '',
@@ -37,7 +38,10 @@ const PurchaseOrderReport = () => {
                 if (fullUser) {
                     assignedIds = fullUser.assignedOrderIds || [];
                     isExternal = fullUser.role === 'EXTERNAL';
+                    setUserRole(fullUser.role);
                 }
+            } else {
+                setUserRole(loggedUser.role || '');
             }
         }
 
@@ -261,10 +265,14 @@ const PurchaseOrderReport = () => {
 
                         <button
                             onClick={handleSubmit}
-                            className="btn-primary w-full flex items-center justify-center gap-2 py-4 shadow-xl shadow-amber-500/10 bg-amber-600 hover:bg-amber-700 border-none mt-4"
+                            disabled={userRole === 'OBSERVER'}
+                            className={`w-full flex items-center justify-center gap-2 py-4 shadow-xl mt-4 rounded-2xl font-bold uppercase tracking-widest transition-all ${userRole === 'OBSERVER'
+                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
+                                    : 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-500/10'
+                                }`}
                         >
                             <Send size={20} />
-                            Enviar Reporte de Despacho
+                            {userRole === 'OBSERVER' ? 'Acceso de Solo Lectura' : 'Enviar Reporte de Despacho'}
                         </button>
                     </div>
                 </div>

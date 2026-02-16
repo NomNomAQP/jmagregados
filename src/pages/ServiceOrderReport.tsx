@@ -8,6 +8,7 @@ const ServiceOrderReport = () => {
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
     const [selectedOrderId, setSelectedOrderId] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [userRole, setUserRole] = useState<string>('');
 
     const [formData, setFormData] = useState({
         orderId: '',
@@ -40,7 +41,10 @@ const ServiceOrderReport = () => {
                 if (fullUser) {
                     assignedIds = fullUser.assignedOrderIds || [];
                     isExternal = fullUser.role === 'EXTERNAL';
+                    setUserRole(fullUser.role);
                 }
+            } else {
+                setUserRole(loggedUser.role || '');
             }
         }
 
@@ -298,10 +302,14 @@ const ServiceOrderReport = () => {
 
                         <button
                             onClick={handleSubmit}
-                            className="btn-primary w-full flex items-center justify-center gap-2 py-4 shadow-xl shadow-primary/20 mt-4"
+                            disabled={userRole === 'OBSERVER'}
+                            className={`w-full flex items-center justify-center gap-2 py-4 shadow-xl mt-4 rounded-2xl font-bold uppercase tracking-widest transition-all ${userRole === 'OBSERVER'
+                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
+                                    : 'btn-primary shadow-primary/20'
+                                }`}
                         >
                             <Save size={20} />
-                            Enviar Reporte Diario
+                            {userRole === 'OBSERVER' ? 'Acceso de Solo Lectura' : 'Enviar Reporte Diario'}
                         </button>
                     </div>
                 </div>
