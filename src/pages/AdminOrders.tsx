@@ -84,9 +84,7 @@ const AdminOrders = () => {
             order_type: item.type,
             description: item.description,
             client: item.client,
-            notification_date: item.notificationDate,
-            start_date: item.startDate,
-            end_date: item.endDate,
+            // Omitimos start_date, end_date y notification_date porque no existen en la BD
             total_amount: item.totalAmount,
             status: item.status,
             progress: item.progress,
