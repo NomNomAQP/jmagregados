@@ -443,7 +443,7 @@ const AdminOrders = () => {
                 if (errV) throw errV;
             }
 
-            alert("¡Sincronización Exitosa! Los datos se han subido correctamente. El usuario externo ya puede ver el avance actualizado.");
+            alert("¡ÉXITO TOTAL! Los datos están ahora en la nube de Supabase. El usuario externo ya puede ver el avance.");
         } catch (err: any) {
             console.error("Error detallado de sincronización:", err);
             const detail = err.message || err.details || String(err);
