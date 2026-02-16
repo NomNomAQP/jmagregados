@@ -9,6 +9,7 @@ import {
 import type { Order, OrderItem, Voucher } from '../types';
 import { getLimaDate, parseLimaDateString } from '../utils/dateUtils';
 import { INITIAL_ORDERS } from '../data/initialData';
+import { supabase } from '../utils/supabase';
 
 const AdminOrders = () => {
     const [view, setView] = useState<'LIST' | 'CREATE' | 'DETAIL'>('LIST');
@@ -23,6 +24,7 @@ const AdminOrders = () => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
     const [expenses, setExpenses] = useState<any[]>([]);
+    const [isSyncing, setIsSyncing] = useState(false);
     const [currentUserRole, setCurrentUserRole] = useState<string>('ADMIN');
 
     // Form State
@@ -37,43 +39,70 @@ const AdminOrders = () => {
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
     useEffect(() => {
-        const savedOrders = localStorage.getItem('antigravity_orders');
-        const savedVouchers = localStorage.getItem('antigravity_vouchers');
-        const savedExpenses = localStorage.getItem('antigravity_expenses');
-        const loggedUserStr = localStorage.getItem('antigravity_logged_user');
+        const loadAllData = async () => {
+            setIsSyncing(true);
 
-        let isExternal = false;
-        let assigned: string[] = [];
+            // 1. Cargar datos de LocalStorage (Inmediato)
+            const savedOrders = localStorage.getItem('antigravity_orders');
+            const savedVouchers = localStorage.getItem('antigravity_vouchers');
+            const savedExpenses = localStorage.getItem('antigravity_expenses');
 
-        if (loggedUserStr) {
-            const loggedUser = JSON.parse(loggedUserStr);
-            const savedUsersStr = localStorage.getItem('antigravity_users_list');
-            if (savedUsersStr) {
-                const users = JSON.parse(savedUsersStr);
-                const fullUser = users.find((u: any) => u.name === loggedUser.name);
-                if (fullUser) {
-                    setCurrentUserRole(fullUser.role);
-                    isExternal = fullUser.role === 'EXTERNAL';
-                    assigned = fullUser.assignedOrderIds || [];
+            if (savedOrders) setOrders(JSON.parse(savedOrders));
+            if (savedVouchers) setVouchers(JSON.parse(savedVouchers));
+            if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
+
+            // 2. Intentar Sincronizar con Supabase (Persistente)
+            if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+                try {
+                    // Cargar Órdenes
+                    const { data: dbOrders, error: errO } = await supabase.from('orders').select('*');
+                    if (dbOrders && !errO) {
+                        setOrders(dbOrders);
+                        localStorage.setItem('antigravity_orders', JSON.stringify(dbOrders));
+                    }
+
+                    // Cargar Vales
+                    const { data: dbVouchers, error: errV } = await supabase.from('vouchers').select('*');
+                    if (dbVouchers && !errV) {
+                        setVouchers(dbVouchers);
+                        localStorage.setItem('antigravity_vouchers', JSON.stringify(dbVouchers));
+                    }
+
+                    // Cargar Gastos
+                    const { data: dbExpenses, error: errE } = await supabase.from('expenses').select('*');
+                    if (dbExpenses && !errE) {
+                        setExpenses(dbExpenses);
+                        localStorage.setItem('antigravity_expenses', JSON.stringify(dbExpenses));
+                    }
+                } catch (err) {
+                    console.error("Cloud Sync Error:", err);
                 }
-            } else {
-                setCurrentUserRole(loggedUser.role || 'ADMIN');
+            } else if (!savedOrders) {
+                // Fallback a iniciales solo si no hay nada en ningún lado
+                setOrders(INITIAL_ORDERS);
+                localStorage.setItem('antigravity_orders', JSON.stringify(INITIAL_ORDERS));
             }
-        }
 
-        if (savedOrders) {
-            let parsed = JSON.parse(savedOrders) || [];
-            if (isExternal) {
-                parsed = parsed.filter((o: Order) => assigned.includes(o.id));
+            setIsSyncing(false);
+        };
+
+        const loadRoles = async () => {
+            const loggedUserStr = localStorage.getItem('antigravity_logged_user');
+            if (loggedUserStr) {
+                const loggedUser = JSON.parse(loggedUserStr);
+                const savedUsersStr = localStorage.getItem('antigravity_users_list');
+                if (savedUsersStr) {
+                    const users = JSON.parse(savedUsersStr);
+                    const fullUser = users.find((u: any) => u.name === loggedUser.name);
+                    if (fullUser) {
+                        setCurrentUserRole(fullUser.role);
+                    }
+                }
             }
-            setOrders(parsed);
-        } else if (!isExternal) {
-            setOrders(INITIAL_ORDERS);
-            localStorage.setItem('antigravity_orders', JSON.stringify(INITIAL_ORDERS));
-        }
+        };
 
-        if (savedVouchers) setVouchers(JSON.parse(savedVouchers) || []);
-        if (savedExpenses) setExpenses(JSON.parse(savedExpenses) || []);
+        loadAllData();
+        loadRoles();
     }, []);
 
     const handleAddItem = () => {
@@ -145,18 +174,19 @@ const AdminOrders = () => {
         return (items || []).reduce((sum, item) => sum + (item.total || 0), 0);
     };
 
-    const handleSaveOrder = () => {
+    const handleSaveOrder = async () => {
         if (!orderNumber || !client) {
             alert('Por favor complete el Nro de Orden y la Entidad Solicitante');
             return;
         }
 
         let updatedOrders: Order[];
+        let finalOrder: Order;
 
         if (editingOrderId) {
             updatedOrders = orders.map(o => {
                 if (o.id === editingOrderId) {
-                    return {
+                    finalOrder = {
                         ...o,
                         orderNumber,
                         type: orderType,
@@ -166,12 +196,13 @@ const AdminOrders = () => {
                         totalAmount: calculateTotal(),
                         items
                     };
+                    return finalOrder;
                 }
                 return o;
             });
             alert('Orden actualizada exitosamente');
         } else {
-            const newOrder: Order = {
+            finalOrder = {
                 id: Date.now().toString(),
                 orderNumber,
                 type: orderType,
@@ -187,12 +218,23 @@ const AdminOrders = () => {
                 items,
                 expenses: []
             };
-            updatedOrders = [...orders, newOrder];
+            updatedOrders = [...orders, finalOrder];
             alert('Orden creada exitosamente');
         }
 
+        // Persistir en Local
         setOrders(updatedOrders);
         localStorage.setItem('antigravity_orders', JSON.stringify(updatedOrders));
+
+        // Persistir en Supabase
+        if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+            try {
+                const { error } = await supabase.from('orders').upsert(finalOrder!);
+                if (error) console.error("Cloud Save Error:", error);
+            } catch (err) {
+                console.error("Cloud Exception:", err);
+            }
+        }
 
         // Reset
         setEditingOrderId(null);
@@ -213,8 +255,17 @@ const AdminOrders = () => {
         setActiveMenuId(null);
     };
 
-    const handleDelete = (id: string) => {
+    const handleDelete = async (id: string) => {
         if (confirm('¿Está seguro de eliminar esta orden? Todos los datos asociados se perderán.')) {
+            // Borrar en Supabase
+            if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+                try {
+                    await supabase.from('orders').delete().eq('id', id);
+                } catch (err) {
+                    console.error("Cloud Delete Error:", err);
+                }
+            }
+
             const updatedOrders = orders.filter(o => o.id !== id);
             setOrders(updatedOrders);
             localStorage.setItem('antigravity_orders', JSON.stringify(updatedOrders));
@@ -713,8 +764,9 @@ const AdminOrders = () => {
         <div className="space-y-8 pb-12">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-800 tracking-tight">
-                        {view === 'LIST' ? 'Gestión de Ordenes' : editingOrderId ? 'Editar Orden' : 'Nueva Orden Técnica'}
+                    <h1 className="text-3xl font-bold text-slate-800 tracking-tight flex items-center gap-3">
+                        {view === 'LIST' ? 'Gestión de Órdenes' : editingOrderId ? 'Editar Orden' : 'Nueva Orden Técnica'}
+                        {isSyncing && <Activity size={20} className="text-primary animate-pulse" />}
                     </h1>
                     <p className="text-slate-500 font-medium mt-1">
                         {view === 'LIST' ? 'Configuración técnica y administrativa del contrato' : 'Complete los campos para registrar la orden en el sistema'}
