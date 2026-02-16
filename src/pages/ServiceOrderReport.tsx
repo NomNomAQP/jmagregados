@@ -25,11 +25,33 @@ const ServiceOrderReport = () => {
     useEffect(() => {
         const savedOrders = localStorage.getItem('antigravity_orders');
         const savedVouchers = localStorage.getItem('antigravity_vouchers');
+        const loggedUserStr = localStorage.getItem('antigravity_logged_user');
+
+        let assignedIds: string[] = [];
+        let isExternal = false;
+
+        if (loggedUserStr) {
+            const loggedUser = JSON.parse(loggedUserStr);
+            // Buscamos el usuario completo en la lista para obtener sus órdenes asignadas
+            const savedUsersStr = localStorage.getItem('antigravity_users_list');
+            if (savedUsersStr) {
+                const users = JSON.parse(savedUsersStr);
+                const fullUser = users.find((u: any) => u.name === loggedUser.name);
+                if (fullUser) {
+                    assignedIds = fullUser.assignedOrderIds || [];
+                    isExternal = fullUser.role === 'EXTERNAL';
+                }
+            }
+        }
 
         if (savedOrders) {
             const parsed = JSON.parse(savedOrders) as Order[];
-            // Aseguramos que se vean todas las órdenes de servicio, sin importar el estado
-            setOrders(parsed.filter(o => o.type === 'SERVICE'));
+            // Filtrar por servicio y por asignación si es externo
+            let filtered = parsed.filter(o => o.type === 'SERVICE');
+            if (isExternal) {
+                filtered = filtered.filter(o => assignedIds.includes(o.id));
+            }
+            setOrders(filtered);
         }
 
         if (savedVouchers) {

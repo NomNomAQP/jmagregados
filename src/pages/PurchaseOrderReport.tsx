@@ -23,10 +23,31 @@ const PurchaseOrderReport = () => {
     useEffect(() => {
         const savedOrders = localStorage.getItem('antigravity_orders');
         const savedVouchers = localStorage.getItem('antigravity_vouchers');
+        const loggedUserStr = localStorage.getItem('antigravity_logged_user');
+
+        let assignedIds: string[] = [];
+        let isExternal = false;
+
+        if (loggedUserStr) {
+            const loggedUser = JSON.parse(loggedUserStr);
+            const savedUsersStr = localStorage.getItem('antigravity_users_list');
+            if (savedUsersStr) {
+                const users = JSON.parse(savedUsersStr);
+                const fullUser = users.find((u: any) => u.name === loggedUser.name);
+                if (fullUser) {
+                    assignedIds = fullUser.assignedOrderIds || [];
+                    isExternal = fullUser.role === 'EXTERNAL';
+                }
+            }
+        }
 
         if (savedOrders) {
             const parsed = JSON.parse(savedOrders) as Order[];
-            setOrders(parsed.filter(o => o.type === 'PURCHASE'));
+            let filtered = parsed.filter(o => o.type === 'PURCHASE');
+            if (isExternal) {
+                filtered = filtered.filter(o => assignedIds.includes(o.id));
+            }
+            setOrders(filtered);
         }
 
         if (savedVouchers) {

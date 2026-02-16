@@ -4,37 +4,63 @@ import { Shield, Database, Save, CheckCircle2, Users, MoreHorizontal, AlertCircl
 interface User {
     id: string;
     name: string;
-    role: 'ADMIN' | 'OPERATOR' | 'REPORTER';
+    role: 'ADMIN' | 'OPERATOR' | 'REPORTER' | 'EXTERNAL';
     avatar: string;
     username?: string;
     password?: string;
+    assignedOrderIds?: string[];
 }
 
 const Configuracion = () => {
     const [users, setUsers] = useState<User[]>([]);
+    const [orders, setOrders] = useState<any[]>([]);
     const [showSuccess, setShowSuccess] = useState(false);
+    const [editingUser, setEditingUser] = useState<User | null>(null);
 
     useEffect(() => {
         // Cargar usuarios de localStorage o usar una lista por defecto si no hay
         const savedUsers = localStorage.getItem('antigravity_users_list');
+        const savedOrders = localStorage.getItem('antigravity_orders');
+
         if (savedUsers) {
             setUsers(JSON.parse(savedUsers));
         } else {
             const initialUsers: User[] = [
-                { id: '1', name: 'Bryan Portilla', role: 'ADMIN', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Bryan', username: 'admin', password: '123' },
-                { id: '2', name: 'Juan Operador', role: 'OPERATOR', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Juan', username: 'operador', password: '123' },
-                { id: '3', name: 'Maria Reportes', role: 'REPORTER', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Maria', username: 'reporter', password: '123' },
+                { id: '1', name: 'Bryan Portilla', role: 'ADMIN', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Bryan', username: 'admin', password: '123', assignedOrderIds: [] },
+                { id: '2', name: 'Juan Operador', role: 'OPERATOR', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Juan', username: 'operador', password: '123', assignedOrderIds: [] },
+                { id: '3', name: 'Maria Reportes', role: 'REPORTER', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Maria', username: 'reporter', password: '123', assignedOrderIds: [] },
             ];
             setUsers(initialUsers);
             localStorage.setItem('antigravity_users_list', JSON.stringify(initialUsers));
         }
+
+        if (savedOrders) {
+            setOrders(JSON.parse(savedOrders));
+        }
     }, []);
 
-    const handleRoleChange = (userId: string, newRole: 'ADMIN' | 'OPERATOR' | 'REPORTER') => {
+    const handleRoleChange = (userId: string, newRole: User['role']) => {
         const updatedUsers = users.map(user =>
             user.id === userId ? { ...user, role: newRole } : user
         );
         setUsers(updatedUsers);
+    };
+
+    const toggleOrderForUser = (userId: string, orderId: string) => {
+        const updatedUsers = users.map(user => {
+            if (user.id === userId) {
+                const currentAssigned = user.assignedOrderIds || [];
+                const newAssigned = currentAssigned.includes(orderId)
+                    ? currentAssigned.filter(id => id !== orderId)
+                    : [...currentAssigned, orderId];
+                return { ...user, assignedOrderIds: newAssigned };
+            }
+            return user;
+        });
+        setUsers(updatedUsers);
+        if (editingUser && editingUser.id === userId) {
+            setEditingUser(updatedUsers.find(u => u.id === userId) || null);
+        }
     };
 
     const saveChanges = () => {
@@ -130,10 +156,14 @@ const Configuracion = () => {
                                                     <option value="ADMIN">Administrador</option>
                                                     <option value="OPERATOR">Operador</option>
                                                     <option value="REPORTER">Reportador</option>
+                                                    <option value="EXTERNAL">Externo (Visualizador)</option>
                                                 </select>
                                             </td>
                                             <td className="px-6 py-5 text-right">
-                                                <button className="p-2 text-slate-300 hover:text-slate-600 transition-colors">
+                                                <button
+                                                    onClick={() => setEditingUser(user)}
+                                                    className="p-2 text-slate-300 hover:text-primary transition-colors bg-slate-50 rounded-xl"
+                                                >
                                                     <MoreHorizontal size={20} />
                                                 </button>
                                             </td>
@@ -158,6 +188,10 @@ const Configuracion = () => {
                                 <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
                                     <p className="text-amber-400 text-[10px] font-black uppercase mb-2">Operador / Reportador</p>
                                     <p className="text-xs text-slate-400 leading-relaxed font-medium">Acceso restringido. Solo ven los Reportes de Servicio y Compras.</p>
+                                </div>
+                                <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
+                                    <p className="text-emerald-400 text-[10px] font-black uppercase mb-2">Externo</p>
+                                    <p className="text-xs text-slate-400 leading-relaxed font-medium">Acceso hiper-restringido. Solo ve reportes de órdenes asignadas por Admin.</p>
                                 </div>
                                 <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
                                     <p className="text-slate-400 text-[10px] font-black uppercase mb-2">Seguridad</p>
@@ -186,6 +220,74 @@ const Configuracion = () => {
                     </div>
                 </div>
             </div>
+            {/* Modal de Asignación de Órdenes */}
+            {editingUser && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+                        <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+                            <div className="flex items-center gap-3">
+                                <img src={editingUser.avatar} className="w-10 h-10 rounded-xl" alt="" />
+                                <div>
+                                    <h3 className="font-bold text-slate-800">Gestionar Órdenes Asignadas</h3>
+                                    <p className="text-xs text-slate-400 font-medium">{editingUser.name} • {editingUser.role}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setEditingUser(null)} className="p-2 hover:bg-white rounded-xl transition-colors text-slate-400">
+                                <AlertCircle size={20} className="rotate-45" />
+                            </button>
+                        </div>
+                        <div className="p-8 space-y-6">
+                            <div className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex gap-3 text-blue-700">
+                                <AlertCircle size={20} className="shrink-0 mt-0.5" />
+                                <div className="text-xs font-medium leading-relaxed">
+                                    Marque las órdenes que desea que este usuario pueda visualizar en su apartado de reportes. Si el rol es <b>Externo</b>, solo verá las que estén seleccionadas aquí.
+                                </div>
+                            </div>
+
+                            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                                {orders.map(order => {
+                                    const isChecked = (editingUser.assignedOrderIds || []).includes(order.id);
+                                    return (
+                                        <div
+                                            key={order.id}
+                                            onClick={() => toggleOrderForUser(editingUser.id, order.id)}
+                                            className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${isChecked ? 'bg-primary/5 border-primary/20' : 'bg-slate-50 border-slate-100 hover:border-slate-200'}`}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${isChecked ? 'bg-primary border-primary text-white' : 'bg-white border-slate-200'}`}>
+                                                    {isChecked && <CheckCircle2 size={12} />}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-bold text-slate-800">{order.orderNumber}</p>
+                                                    <p className="text-[10px] text-slate-500 font-medium uppercase">{order.type === 'SERVICE' ? 'Servicio' : 'Compra'} • {order.client}</p>
+                                                </div>
+                                            </div>
+                                            <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black ${order.status === 'COMPLETED' ? 'bg-slate-200 text-slate-500' : 'bg-green-100 text-green-600'}`}>
+                                                {order.status === 'COMPLETED' ? 'ARCHIVADO' : 'ACTIVO'}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                                {orders.length === 0 && (
+                                    <div className="text-center py-12 text-slate-400">
+                                        <Database size={32} className="mx-auto mb-2 opacity-20" />
+                                        <p className="text-sm font-bold">No hay órdenes registradas en el sistema aún.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="pt-4">
+                                <button
+                                    onClick={() => setEditingUser(null)}
+                                    className="w-full py-4 rounded-2xl font-bold text-white bg-slate-900 shadow-xl hover:bg-slate-800 transition-all"
+                                >
+                                    Cerrar y Continuar Configuraciones
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

@@ -23,6 +23,7 @@ const AdminOrders = () => {
     const [orders, setOrders] = useState<Order[]>([]);
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
     const [expenses, setExpenses] = useState<any[]>([]);
+    const [currentUserRole, setCurrentUserRole] = useState<string>('ADMIN');
 
     // Form State
     const [orderNumber, setOrderNumber] = useState('');
@@ -39,13 +40,38 @@ const AdminOrders = () => {
         const savedOrders = localStorage.getItem('antigravity_orders');
         const savedVouchers = localStorage.getItem('antigravity_vouchers');
         const savedExpenses = localStorage.getItem('antigravity_expenses');
+        const loggedUserStr = localStorage.getItem('antigravity_logged_user');
+
+        let isExternal = false;
+        let assigned: string[] = [];
+
+        if (loggedUserStr) {
+            const loggedUser = JSON.parse(loggedUserStr);
+            const savedUsersStr = localStorage.getItem('antigravity_users_list');
+            if (savedUsersStr) {
+                const users = JSON.parse(savedUsersStr);
+                const fullUser = users.find((u: any) => u.name === loggedUser.name);
+                if (fullUser) {
+                    setCurrentUserRole(fullUser.role);
+                    isExternal = fullUser.role === 'EXTERNAL';
+                    assigned = fullUser.assignedOrderIds || [];
+                }
+            } else {
+                setCurrentUserRole(loggedUser.role || 'ADMIN');
+            }
+        }
 
         if (savedOrders) {
-            setOrders(JSON.parse(savedOrders) || []);
-        } else {
+            let parsed = JSON.parse(savedOrders) || [];
+            if (isExternal) {
+                parsed = parsed.filter((o: Order) => assigned.includes(o.id));
+            }
+            setOrders(parsed);
+        } else if (!isExternal) {
             setOrders(INITIAL_ORDERS);
             localStorage.setItem('antigravity_orders', JSON.stringify(INITIAL_ORDERS));
         }
+
         if (savedVouchers) setVouchers(JSON.parse(savedVouchers) || []);
         if (savedExpenses) setExpenses(JSON.parse(savedExpenses) || []);
     }, []);
@@ -694,26 +720,31 @@ const AdminOrders = () => {
                         {view === 'LIST' ? 'Configuración técnica y administrativa del contrato' : 'Complete los campos para registrar la orden en el sistema'}
                     </p>
                 </div>
-                <button
-                    onClick={() => {
-                        if (view !== 'LIST') {
-                            setEditingOrderId(null);
-                            setOrderNumber(''); setClient(''); setDescription(''); setNotificationDate(getLimaDate());
-                            setItems([{ id: '1', description: '', quantity: 0, unit: 'm3', unitPrice: 0, total: 0, delivered: 0, deadlines: [{ id: 'd1', deadlineNumber: 1, daysToComplete: 0, quantity: 0, deliveredQuantity: 0, status: 'PENDING' }] }]);
-                        }
-                        setView(view === 'LIST' ? 'CREATE' : 'LIST');
-                    }}
-                    className="btn-primary flex items-center gap-2"
-                >
-                    {view === 'LIST' ? (
-                        <>
-                            <Plus size={20} />
-                            Nueva Orden
-                        </>
-                    ) : (
-                        'Volver a la lista'
-                    )}
-                </button>
+                {currentUserRole !== 'EXTERNAL' && (
+                    <button
+                        onClick={() => {
+                            if (view !== 'LIST') {
+                                setEditingOrderId(null);
+                                setOrderNumber(''); setClient(''); setDescription(''); setNotificationDate(getLimaDate());
+                                setItems([{ id: '1', description: '', quantity: 0, unit: 'm3', unitPrice: 0, total: 0, delivered: 0, deadlines: [{ id: 'd1', deadlineNumber: 1, daysToComplete: 0, quantity: 0, deliveredQuantity: 0, status: 'PENDING' }] }]);
+                            }
+                            setView(view === 'LIST' ? 'CREATE' : 'LIST');
+                        }}
+                        className="btn-primary flex items-center gap-2"
+                    >
+                        {view === 'LIST' ? (
+                            <>
+                                <Plus size={20} />
+                                Nueva Orden
+                            </>
+                        ) : (
+                            'Volver a la lista'
+                        )}
+                    </button>
+                )}
+                {currentUserRole === 'EXTERNAL' && view !== 'LIST' && (
+                    <button onClick={() => setView('LIST')} className="btn-primary">Volver a la lista</button>
+                )}
             </div>
 
             {view === 'LIST' ? (
@@ -784,7 +815,14 @@ const AdminOrders = () => {
                                                     </td>
                                                     <td className="px-8 py-5">
                                                         <button
-                                                            onClick={(e) => handleToggleStatus(e, order)}
+                                                            onClick={(e) => {
+                                                                if (currentUserRole !== 'EXTERNAL') {
+                                                                    handleToggleStatus(e, order);
+                                                                } else {
+                                                                    e.stopPropagation();
+                                                                }
+                                                            }}
+                                                            disabled={currentUserRole === 'EXTERNAL'}
                                                             className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${order.status === 'COMPLETED'
                                                                 ? 'bg-slate-100 text-slate-400 hover:bg-slate-200'
                                                                 : 'bg-green-50 text-green-600 hover:bg-green-100 border border-green-100'
@@ -812,22 +850,26 @@ const AdminOrders = () => {
                                                                 >
                                                                     <Eye size={16} className="text-primary" /> Visualizar Orden
                                                                 </button>
-                                                                <button
-                                                                    onClick={() => handleEdit(order)}
-                                                                    className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
-                                                                >
-                                                                    <Edit3 size={16} className="text-amber-500" /> Editar Orden
-                                                                </button>
-                                                                <button className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors">
-                                                                    <TrendingUp size={16} className="text-indigo-500" /> Ver Reportes
-                                                                </button>
-                                                                <div className="h-[1px] bg-slate-50 my-1"></div>
-                                                                <button
-                                                                    onClick={() => handleDelete(order.id)}
-                                                                    className="w-full px-4 py-2.5 text-left text-sm font-bold text-red-500 hover:bg-red-50 flex items-center gap-3 transition-colors"
-                                                                >
-                                                                    <Trash2 size={16} /> Eliminar
-                                                                </button>
+                                                                {currentUserRole !== 'EXTERNAL' && (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={() => handleEdit(order)}
+                                                                            className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors"
+                                                                        >
+                                                                            <Edit3 size={16} className="text-amber-500" /> Editar Orden
+                                                                        </button>
+                                                                        <button className="w-full px-4 py-2.5 text-left text-sm font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-3 transition-colors">
+                                                                            <TrendingUp size={16} className="text-indigo-500" /> Ver Reportes
+                                                                        </button>
+                                                                        <div className="h-[1px] bg-slate-50 my-1"></div>
+                                                                        <button
+                                                                            onClick={() => handleDelete(order.id)}
+                                                                            className="w-full px-4 py-2.5 text-left text-sm font-bold text-red-500 hover:bg-red-50 flex items-center gap-3 transition-colors"
+                                                                        >
+                                                                            <Trash2 size={16} /> Eliminar
+                                                                        </button>
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         )}
                                                     </td>

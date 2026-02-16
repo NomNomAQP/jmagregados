@@ -1,10 +1,13 @@
-export type UserRole = 'ADMIN' | 'OPERATOR' | 'REPORTER' | 'CLIENT';
+export type UserRole = 'ADMIN' | 'OPERATOR' | 'REPORTER' | 'CLIENT' | 'EXTERNAL';
 
 export interface User {
     id: string;
     name: string;
     role: UserRole;
     avatar?: string;
+    username?: string;
+    password?: string;
+    assignedOrderIds?: string[]; // IDs de órdenes que el usuario externo puede visualizar
 }
 
 export interface OrderDeadline {

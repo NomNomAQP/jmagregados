@@ -25,10 +25,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
     const menuItems = [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/', roles: ['ADMIN'] },
-        { icon: ClipboardList, label: 'Reporte de Servicio', path: '/servicios', roles: ['ADMIN', 'OPERATOR', 'REPORTER'] },
-        { icon: ShoppingCart, label: 'Reporte de Compras', path: '/compras', roles: ['ADMIN', 'OPERATOR', 'REPORTER'] },
+        { icon: ClipboardList, label: 'Reporte de Servicio', path: '/servicios', roles: ['ADMIN', 'OPERATOR', 'REPORTER', 'EXTERNAL'] },
+        { icon: ShoppingCart, label: 'Reporte de Compras', path: '/compras', roles: ['ADMIN', 'OPERATOR', 'REPORTER', 'EXTERNAL'] },
         { icon: TrendingDown, label: 'Gastos', path: '/gastos', roles: ['ADMIN'] },
-        { icon: BarChart3, label: 'Reportes', path: '/reportes', roles: ['ADMIN'] },
+        { icon: BarChart3, label: 'Reportes', path: '/reportes', roles: ['ADMIN', 'EXTERNAL'] },
         { icon: Users, label: 'Equipo', path: '/equipo', roles: ['ADMIN'] },
         { icon: Settings, label: 'Configuración', path: '/configuracion', roles: ['ADMIN'] },
     ];
