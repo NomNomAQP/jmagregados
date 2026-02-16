@@ -70,11 +70,20 @@ const Configuracion = () => {
         setIsSyncing(false);
     };
 
-    const handleRoleChange = (userId: string, newRole: User['role']) => {
+    const handleRoleChange = async (userId: string, newRole: User['role']) => {
         const updatedUsers = users.map((user: User) =>
             user.id === userId ? { ...user, role: newRole } : user
         );
         setUsers(updatedUsers);
+
+        // Actualizar en Supabase inmediatamente
+        if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+            try {
+                await supabase.from('users').update({ role: newRole }).eq('id', userId);
+            } catch (err) {
+                console.error("Cloud Role Update Error:", err);
+            }
+        }
     };
 
     const togglePasswordVisibility = (userId: string) => {
@@ -147,30 +156,57 @@ const Configuracion = () => {
         }
     };
 
-    const toggleOrderForUser = (userId: string, orderId: string) => {
-        const updatedUsers = users.map((user: User) => {
-            if (user.id === userId) {
-                const currentAssigned = user.assignedOrderIds || [];
-                const newAssigned = currentAssigned.includes(orderId)
-                    ? currentAssigned.filter((id: string) => id !== orderId)
-                    : [...currentAssigned, orderId];
-                return { ...user, assignedOrderIds: newAssigned };
-            }
-            return user;
-        });
+    const toggleOrderForUser = async (userId: string, orderId: string) => {
+        const userToUpdate = users.find((u: User) => u.id === userId);
+        if (!userToUpdate) return;
+
+        const currentAssigned = userToUpdate.assignedOrderIds || [];
+        const newAssigned = currentAssigned.includes(orderId)
+            ? currentAssigned.filter((id: string) => id !== orderId)
+            : [...currentAssigned, orderId];
+
+        const updatedUsers = users.map((user: User) =>
+            user.id === userId ? { ...user, assignedOrderIds: newAssigned } : user
+        );
+
         setUsers(updatedUsers);
         if (editingUser && editingUser.id === userId) {
-            setEditingUser(updatedUsers.find((u: User) => u.id === userId) || null);
+            setEditingUser({ ...userToUpdate, assignedOrderIds: newAssigned });
+        }
+
+        // Actualizar en Supabase inmediatamente
+        if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+            try {
+                await supabase.from('users').update({ assignedOrderIds: newAssigned }).eq('id', userId);
+            } catch (err) {
+                console.error("Cloud Assignment Update Error:", err);
+            }
         }
     };
 
-    const saveChanges = () => {
+    const saveChanges = async () => {
         localStorage.setItem('antigravity_users_list', JSON.stringify(users));
 
-        // Actualizar el rol del usuario actual si está en la lista (basado en el nombre para este demo)
-        const currentUser = users.find((u: User) => u.name === 'Bryan Portilla');
-        if (currentUser) {
-            localStorage.setItem('antigravity_user_role', currentUser.role);
+        // Actualizar en Supabase para asegurar persistencia masiva si fuera necesario
+        if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+            try {
+                for (const user of users) {
+                    await supabase.from('users').upsert(user);
+                }
+            } catch (err) {
+                console.error("Cloud Bulk Save Error:", err);
+            }
+        }
+
+        // Obtener usuario logueado actualmente para actualizar su rol en sesión
+        const loggedUserStr = localStorage.getItem('antigravity_logged_user');
+        if (loggedUserStr) {
+            const loggedUser = JSON.parse(loggedUserStr);
+            const currentUser = users.find((u: User) => u.name === loggedUser.name || u.username === loggedUser.username);
+            if (currentUser) {
+                // Actualizar info de sesión
+                localStorage.setItem('antigravity_logged_user', JSON.stringify(currentUser));
+            }
         }
 
         setShowSuccess(true);
