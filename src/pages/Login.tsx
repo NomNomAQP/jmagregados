@@ -23,14 +23,17 @@ const Login = ({ onLogin }: LoginProps) => {
 
         let users = defaultUsers;
         if (savedUsers) {
-            const parsed = JSON.parse(savedUsers);
-            // Si el primer usuario ya tiene username, usamos la lista del storage
-            if (parsed.length > 0 && parsed[0].username) {
-                users = parsed;
+            users = JSON.parse(savedUsers);
+            // Si por alguna razón la lista del storage es vieja y no tiene usernames, habilitar fallback
+            if (users.length > 0 && !users[0].username) {
+                users = defaultUsers;
             }
         }
 
-        const user = users.find((u: any) => u.username === username && u.password === password);
+        const user = users.find((u: any) =>
+            String(u.username || '').toLowerCase() === username.toLowerCase() &&
+            String(u.password || '') === password
+        );
 
         if (user) {
             localStorage.setItem('antigravity_logged_user', JSON.stringify({ name: user.name, role: user.role }));
