@@ -43,7 +43,7 @@ const Login = ({ onLogin }: LoginProps) => {
                     .single();
 
                 if (dbUsers && !dbError) {
-                    localStorage.setItem('antigravity_logged_user', JSON.stringify({ name: dbUsers.name, role: dbUsers.role }));
+                    localStorage.setItem('antigravity_logged_user', JSON.stringify(dbUsers));
                     localStorage.setItem('antigravity_user_role', dbUsers.role);
                     onLogin({ name: dbUsers.name, role: dbUsers.role });
                     return;
@@ -78,7 +78,7 @@ const Login = ({ onLogin }: LoginProps) => {
         );
 
         if (user) {
-            localStorage.setItem('antigravity_logged_user', JSON.stringify({ name: user.name, role: user.role }));
+            localStorage.setItem('antigravity_logged_user', JSON.stringify(user));
             localStorage.setItem('antigravity_user_role', user.role);
             onLogin({ name: user.name, role: user.role });
         } else {

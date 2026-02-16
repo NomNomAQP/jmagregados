@@ -91,15 +91,8 @@ const AdminOrders = () => {
             const loggedUserStr = localStorage.getItem('antigravity_logged_user');
             if (loggedUserStr) {
                 const loggedUser = JSON.parse(loggedUserStr);
-                const savedUsersStr = localStorage.getItem('antigravity_users_list');
-                if (savedUsersStr) {
-                    const users = JSON.parse(savedUsersStr);
-                    const fullUser = users.find((u: any) => u.name === loggedUser.name);
-                    if (fullUser) {
-                        setCurrentUserRole(fullUser.role);
-                        setAssignedOrderIds(fullUser.assignedOrderIds || []);
-                    }
-                }
+                setCurrentUserRole(loggedUser.role);
+                setAssignedOrderIds(loggedUser.assignedOrderIds || []);
             }
         };
 
