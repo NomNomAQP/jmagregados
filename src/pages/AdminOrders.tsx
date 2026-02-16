@@ -4,7 +4,7 @@ import {
     TrendingUp, Trash2, Hash, Edit3,
     Clock, Building2, Package, Save, Eye,
     ArrowLeft, CheckCircle2, AlertCircle, Calendar,
-    ClipboardList, ShoppingCart, X, Activity
+    ClipboardList, ShoppingCart, X, Activity, Cloud, RefreshCw
 } from 'lucide-react';
 import type { Order, OrderItem, Voucher } from '../types';
 import { getLimaDate, parseLimaDateString } from '../utils/dateUtils';
@@ -369,6 +369,35 @@ const AdminOrders = () => {
             }
         } catch (err) {
             console.error("Error fetching vouchers for order:", err);
+        }
+    };
+
+    const forceSyncToCloud = async () => {
+        if (currentUserRole !== 'ADMIN') {
+            alert("Solo el administrador puede sincronizar datos con la nube.");
+            return;
+        }
+
+        setIsSyncing(true);
+        try {
+            // Sincronizar Órdenes
+            if (orders.length > 0) {
+                const { error: errO } = await supabase.from('orders').upsert(orders);
+                if (errO) throw errO;
+            }
+
+            // Sincronizar Vales
+            if (vouchers.length > 0) {
+                const { error: errV } = await supabase.from('vouchers').upsert(vouchers);
+                if (errV) throw errV;
+            }
+
+            alert("¡Sincronización Exitosa! Los datos locales se han subido a la nube. El usuario externo ya debería poder visualizar el avance.");
+        } catch (err) {
+            console.error("Error en sincronización forzada:", err);
+            alert("Error al sincronizar: " + (err instanceof Error ? err.message : "Error desconocido"));
+        } finally {
+            setIsSyncing(false);
         }
     };
 
@@ -830,28 +859,47 @@ const AdminOrders = () => {
                         {view === 'LIST' ? 'Configuración técnica y administrativa del contrato' : 'Complete los campos para registrar la orden en el sistema'}
                     </p>
                 </div>
-                {currentUserRole !== 'EXTERNAL' && (
-                    <button
-                        onClick={() => {
-                            if (view !== 'LIST') {
-                                setEditingOrderId(null);
-                                setOrderNumber(''); setClient(''); setDescription(''); setNotificationDate(getLimaDate());
-                                setItems([{ id: '1', description: '', quantity: 0, unit: 'm3', unitPrice: 0, total: 0, delivered: 0, deadlines: [{ id: 'd1', deadlineNumber: 1, daysToComplete: 0, quantity: 0, deliveredQuantity: 0, status: 'PENDING' }] }]);
-                            }
-                            setView(view === 'LIST' ? 'CREATE' : 'LIST');
-                        }}
-                        className="btn-primary flex items-center gap-2"
-                    >
-                        {view === 'LIST' ? (
-                            <>
-                                <Plus size={20} />
-                                Nueva Orden
-                            </>
-                        ) : (
-                            'Volver a la lista'
-                        )}
-                    </button>
-                )}
+                <div className="flex items-center gap-3">
+                    {currentUserRole === 'ADMIN' && view === 'LIST' && (
+                        <button
+                            onClick={forceSyncToCloud}
+                            disabled={isSyncing}
+                            className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${isSyncing
+                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                    : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100 shadow-lg shadow-emerald-500/10'
+                                }`}
+                        >
+                            {isSyncing ? (
+                                <RefreshCw size={18} className="animate-spin" />
+                            ) : (
+                                <Cloud size={18} />
+                            )}
+                            {isSyncing ? 'Sincronizando...' : 'Sincronizar Nube'}
+                        </button>
+                    )}
+                    {currentUserRole !== 'EXTERNAL' && (
+                        <button
+                            onClick={() => {
+                                if (view !== 'LIST') {
+                                    setEditingOrderId(null);
+                                    setOrderNumber(''); setClient(''); setDescription(''); setNotificationDate(getLimaDate());
+                                    setItems([{ id: '1', description: '', quantity: 0, unit: 'm3', unitPrice: 0, total: 0, delivered: 0, deadlines: [{ id: 'd1', deadlineNumber: 1, daysToComplete: 0, quantity: 0, deliveredQuantity: 0, status: 'PENDING' }] }]);
+                                }
+                                setView(view === 'LIST' ? 'CREATE' : 'LIST');
+                            }}
+                            className="btn-primary flex items-center gap-2"
+                        >
+                            {view === 'LIST' ? (
+                                <>
+                                    <Plus size={20} />
+                                    Nueva Orden
+                                </>
+                            ) : (
+                                'Volver a la lista'
+                            )}
+                        </button>
+                    )}
+                </div>
                 {currentUserRole === 'EXTERNAL' && view !== 'LIST' && (
                     <button onClick={() => setView('LIST')} className="btn-primary">Volver a la lista</button>
                 )}
