@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Shield, Database, Save, CheckCircle2, Users, MoreHorizontal, AlertCircle } from 'lucide-react';
+import { Shield, Database, Save, CheckCircle2, Users, AlertCircle, Eye, EyeOff, UserPlus, Trash2, X } from 'lucide-react';
 
 interface User {
     id: string;
@@ -16,6 +16,14 @@ const Configuracion = () => {
     const [orders, setOrders] = useState<any[]>([]);
     const [showSuccess, setShowSuccess] = useState(false);
     const [editingUser, setEditingUser] = useState<User | null>(null);
+    const [showPasswords, setShowPasswords] = useState<string[]>([]);
+    const [isCreating, setIsCreating] = useState(false);
+    const [newUser, setNewUser] = useState({
+        name: '',
+        username: '',
+        password: '',
+        role: 'OPERATOR' as User['role']
+    });
 
     useEffect(() => {
         // Cargar usuarios de localStorage o usar una lista por defecto si no hay
@@ -40,18 +48,62 @@ const Configuracion = () => {
     }, []);
 
     const handleRoleChange = (userId: string, newRole: User['role']) => {
-        const updatedUsers = users.map(user =>
+        const updatedUsers = users.map((user: User) =>
             user.id === userId ? { ...user, role: newRole } : user
         );
         setUsers(updatedUsers);
     };
 
+    const togglePasswordVisibility = (userId: string) => {
+        setShowPasswords((prev: string[]) =>
+            prev.includes(userId) ? prev.filter((id: string) => id !== userId) : [...prev, userId]
+        );
+    };
+
+    const handleCreateUser = () => {
+        if (!newUser.name || !newUser.username || !newUser.password) {
+            alert('Por favor complete todos los campos');
+            return;
+        }
+
+        const userToAdd: User = {
+            id: Date.now().toString(),
+            name: newUser.name,
+            username: newUser.username,
+            password: newUser.password,
+            role: newUser.role,
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${newUser.name}`,
+            assignedOrderIds: []
+        };
+
+        const updatedUsers = [...users, userToAdd];
+        setUsers(updatedUsers);
+        localStorage.setItem('antigravity_users_list', JSON.stringify(updatedUsers));
+
+        setIsCreating(false);
+        setNewUser({ name: '', username: '', password: '', role: 'OPERATOR' });
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 2000);
+    };
+
+    const handleDeleteUser = (userId: string) => {
+        if (userId === '1') {
+            alert('No se puede eliminar al administrador principal');
+            return;
+        }
+        if (confirm('¿Está seguro de eliminar este usuario?')) {
+            const updatedUsers = users.filter(u => u.id !== userId);
+            setUsers(updatedUsers);
+            localStorage.setItem('antigravity_users_list', JSON.stringify(updatedUsers));
+        }
+    };
+
     const toggleOrderForUser = (userId: string, orderId: string) => {
-        const updatedUsers = users.map(user => {
+        const updatedUsers = users.map((user: User) => {
             if (user.id === userId) {
                 const currentAssigned = user.assignedOrderIds || [];
                 const newAssigned = currentAssigned.includes(orderId)
-                    ? currentAssigned.filter(id => id !== orderId)
+                    ? currentAssigned.filter((id: string) => id !== orderId)
                     : [...currentAssigned, orderId];
                 return { ...user, assignedOrderIds: newAssigned };
             }
@@ -59,7 +111,7 @@ const Configuracion = () => {
         });
         setUsers(updatedUsers);
         if (editingUser && editingUser.id === userId) {
-            setEditingUser(updatedUsers.find(u => u.id === userId) || null);
+            setEditingUser(updatedUsers.find((u: User) => u.id === userId) || null);
         }
     };
 
@@ -67,7 +119,7 @@ const Configuracion = () => {
         localStorage.setItem('antigravity_users_list', JSON.stringify(users));
 
         // Actualizar el rol del usuario actual si está en la lista (basado en el nombre para este demo)
-        const currentUser = users.find(u => u.name === 'Bryan Portilla');
+        const currentUser = users.find((u: User) => u.name === 'Bryan Portilla');
         if (currentUser) {
             localStorage.setItem('antigravity_user_role', currentUser.role);
         }
@@ -116,8 +168,17 @@ const Configuracion = () => {
                                 <h2 className="text-xl font-black text-slate-800">Asignación de Roles</h2>
                                 <p className="text-sm text-slate-500 mt-1 font-medium">Configure los permisos específicos para cada usuario del sistema.</p>
                             </div>
-                            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100">
-                                <Shield size={24} />
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => setIsCreating(true)}
+                                    className="flex items-center gap-2 px-4 py-2.5 bg-primary/10 text-primary rounded-xl font-bold text-xs hover:bg-primary/20 transition-all"
+                                >
+                                    <UserPlus size={16} />
+                                    Nuevo Usuario
+                                </button>
+                                <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100">
+                                    <Shield size={24} />
+                                </div>
                             </div>
                         </div>
 
@@ -127,13 +188,14 @@ const Configuracion = () => {
                                 <thead>
                                     <tr className="text-left bg-slate-50/50 border-b border-slate-100">
                                         <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Usuario</th>
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Estado</th>
+                                        <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Usuario (Login)</th>
+                                        <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Contraseña</th>
                                         <th className="px-6 py-4 text-[10px] font-black uppercase text-slate-400">Rol Asignado</th>
                                         <th className="px-6 py-4"></th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {users.map(user => (
+                                    {users.map((user: User) => (
                                         <tr key={user.id} className="bg-white hover:bg-slate-50/50 transition-colors">
                                             <td className="px-6 py-5">
                                                 <div className="flex items-center gap-3 text-left">
@@ -145,13 +207,26 @@ const Configuracion = () => {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-5">
-                                                <span className="px-2.5 py-1 bg-green-50 text-green-600 rounded-lg text-[10px] font-black uppercase border border-green-100">Activo</span>
+                                                <span className="text-xs font-bold text-slate-600 font-mono bg-slate-100 px-2 py-1 rounded-lg">{user.username || '---'}</span>
+                                            </td>
+                                            <td className="px-6 py-5">
+                                                <div className="flex items-center gap-2 group/pass">
+                                                    <span className="text-xs font-bold text-slate-800 font-mono">
+                                                        {showPasswords.includes(user.id) ? user.password : '••••••••'}
+                                                    </span>
+                                                    <button
+                                                        onClick={() => togglePasswordVisibility(user.id)}
+                                                        className="p-1 text-slate-300 hover:text-primary transition-colors"
+                                                    >
+                                                        {showPasswords.includes(user.id) ? <EyeOff size={14} /> : <Eye size={14} />}
+                                                    </button>
+                                                </div>
                                             </td>
                                             <td className="px-6 py-5">
                                                 <select
                                                     value={user.role}
                                                     onChange={(e) => handleRoleChange(user.id, e.target.value as any)}
-                                                    className="bg-slate-100 border-none rounded-xl px-4 py-2 text-xs font-bold text-slate-600 focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer outline-none"
+                                                    className="bg-slate-100 border-none rounded-xl px-4 py-2 text-xs font-bold text-slate-600 focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer outline-none w-full"
                                                 >
                                                     <option value="ADMIN">Administrador</option>
                                                     <option value="OPERATOR">Operador</option>
@@ -159,13 +234,23 @@ const Configuracion = () => {
                                                     <option value="EXTERNAL">Externo (Visualizador)</option>
                                                 </select>
                                             </td>
-                                            <td className="px-6 py-5 text-right">
-                                                <button
-                                                    onClick={() => setEditingUser(user)}
-                                                    className="p-2 text-slate-300 hover:text-primary transition-colors bg-slate-50 rounded-xl"
-                                                >
-                                                    <MoreHorizontal size={20} />
-                                                </button>
+                                            <td className="px-6 py-5 text-right whitespace-nowrap">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <button
+                                                        onClick={() => setEditingUser(user)}
+                                                        className="p-2 text-slate-300 hover:text-primary transition-colors bg-slate-50 rounded-xl"
+                                                        title="Asignar Órdenes"
+                                                    >
+                                                        <Database size={18} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDeleteUser(user.id)}
+                                                        className="p-2 text-slate-300 hover:text-red-500 transition-colors bg-slate-50 rounded-xl"
+                                                        title="Eliminar Usuario"
+                                                    >
+                                                        <Trash2 size={18} />
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -245,7 +330,7 @@ const Configuracion = () => {
                             </div>
 
                             <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
-                                {orders.map(order => {
+                                {orders.map((order: any) => {
                                     const isChecked = (editingUser.assignedOrderIds || []).includes(order.id);
                                     return (
                                         <div
@@ -282,6 +367,83 @@ const Configuracion = () => {
                                     className="w-full py-4 rounded-2xl font-bold text-white bg-slate-900 shadow-xl hover:bg-slate-800 transition-all"
                                 >
                                     Cerrar y Continuar Configuraciones
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Creación de Usuario */}
+            {isCreating && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300">
+                        <div className="p-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/50">
+                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                <UserPlus size={20} className="text-primary" />
+                                Nuevo Registro de Usuario
+                            </h3>
+                            <button onClick={() => setIsCreating(false)} className="p-2 hover:bg-white rounded-xl transition-colors text-slate-400">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-8 space-y-5">
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Nombre Completo</label>
+                                <input
+                                    type="text"
+                                    className="input-field"
+                                    placeholder="Ej: Carlos Mendivil"
+                                    value={newUser.name}
+                                    onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Nombre de Usuario (Login)</label>
+                                <input
+                                    type="text"
+                                    className="input-field"
+                                    placeholder="Ej: carlosm"
+                                    value={newUser.username}
+                                    onChange={(e) => setNewUser({ ...newUser, username: e.target.value.toLowerCase().replace(/\s/g, '') })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Contraseña</label>
+                                <input
+                                    type="text"
+                                    className="input-field font-mono"
+                                    placeholder="Asigne una contraseña"
+                                    value={newUser.password}
+                                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Rol en la Empresa</label>
+                                <select
+                                    className="input-field"
+                                    value={newUser.role}
+                                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value as any })}
+                                >
+                                    <option value="ADMIN">Administrador</option>
+                                    <option value="OPERATOR">Operador</option>
+                                    <option value="REPORTER">Reportador</option>
+                                    <option value="EXTERNAL">Externo (Visualizador)</option>
+                                </select>
+                            </div>
+
+                            <div className="pt-4 flex gap-3">
+                                <button
+                                    onClick={() => setIsCreating(false)}
+                                    className="flex-1 py-4 rounded-2xl font-bold text-slate-400 hover:bg-slate-50 transition-all border border-slate-100"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleCreateUser}
+                                    className="flex-1 py-4 rounded-2xl font-bold text-white bg-primary shadow-xl shadow-primary/20 hover:bg-primary-dark transition-all"
+                                >
+                                    Registrar Usuario
                                 </button>
                             </div>
                         </div>
