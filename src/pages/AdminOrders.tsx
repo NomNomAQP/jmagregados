@@ -8,7 +8,6 @@ import {
 } from 'lucide-react';
 import type { Order, OrderItem, Voucher } from '../types';
 import { getLimaDate, parseLimaDateString } from '../utils/dateUtils';
-import { INITIAL_ORDERS } from '../data/initialData';
 import { supabase } from '../utils/supabase';
 
 const AdminOrders = () => {
@@ -23,7 +22,7 @@ const AdminOrders = () => {
     // List State
     const [orders, setOrders] = useState<Order[]>([]);
     const [vouchers, setVouchers] = useState<Voucher[]>([]);
-    const [expenses, setExpenses] = useState<any[]>([]);
+    const [expenses] = useState<any[]>([]);
     const [isSyncing, setIsSyncing] = useState(false);
     const [currentUserRole, setCurrentUserRole] = useState<string>('ADMIN');
     const [assignedOrderIds, setAssignedOrderIds] = useState<string[]>([]);
@@ -39,116 +38,102 @@ const AdminOrders = () => {
     ]);
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
 
+    // --- SISTEMA DE MAPEO ROBUSTO ---
+    const mapFromDb = (item: any) => {
+        if (!item) return item;
+        const mapped = { ...item };
+        // Mapeo de Vouchers
+        if (item.order_id) mapped.orderId = item.order_id;
+        if (item.item_id) mapped.itemId = item.item_id;
+        if (item.voucher_no) mapped.voucherNo = item.voucher_no;
+        if (item.reported_by) mapped.reportedBy = item.reported_by;
+        if (item.photo_url) mapped.photoUrl = item.photo_url;
+        if (item.start_meter !== undefined) mapped.startMeter = item.start_meter;
+        if (item.end_meter !== undefined) mapped.endMeter = item.end_meter;
+
+        // Mapeo de Órdenes
+        if (item.order_number) mapped.orderNumber = item.order_number;
+        if (item.notification_date) mapped.notificationDate = item.notification_date;
+        if (item.start_date) mapped.startDate = item.start_date;
+        if (item.end_date) mapped.endDate = item.end_date;
+        if (item.total_amount) mapped.totalAmount = item.total_amount;
+        if (item.order_type) mapped.type = item.order_type;
+        return mapped;
+    };
+
+    const mapToDb = (item: any, table: 'orders' | 'vouchers') => {
+        if (table === 'vouchers') {
+            return {
+                id: item.id,
+                order_id: item.orderId,
+                item_id: item.itemId,
+                date: item.date,
+                quantity: item.quantity,
+                voucher_no: item.voucherNo,
+                type: item.type,
+                reported_by: item.reportedBy,
+                photo_url: item.photoUrl,
+                activity: item.activity,
+                start_meter: item.startMeter,
+                end_meter: item.endMeter
+            };
+        }
+        return {
+            id: item.id,
+            order_number: item.orderNumber,
+            order_type: item.type,
+            description: item.description,
+            client: item.client,
+            notification_date: item.notificationDate,
+            start_date: item.startDate,
+            end_date: item.endDate,
+            total_amount: item.totalAmount,
+            status: item.status,
+            progress: item.progress,
+            items: item.items
+        };
+    };
+
     useEffect(() => {
         const syncAppData = async () => {
             setIsSyncing(true);
-
-            // 1. Cargar Usuario y Roles Primero
-            const loggedUserStr = localStorage.getItem('antigravity_logged_user');
-            let currentRole = 'ADMIN';
-            let assignedIds: string[] = [];
-
-            if (loggedUserStr) {
-                const loggedUser = JSON.parse(loggedUserStr);
-                currentRole = loggedUser.role;
-                assignedIds = loggedUser.assignedOrderIds || [];
-
-                // Intentar refrescar perfil desde Supabase
-                if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
-                    try {
-                        const { data: dbUser } = await supabase.from('users').select('*')
-                            .eq(loggedUser.id ? 'id' : 'name', loggedUser.id || loggedUser.name)
-                            .single();
-                        if (dbUser) {
-                            currentRole = dbUser.role;
-                            assignedIds = dbUser.assignedOrderIds || [];
-                            setCurrentUserRole(dbUser.role);
-                            setAssignedOrderIds(dbUser.assignedOrderIds || []);
-                            localStorage.setItem('antigravity_logged_user', JSON.stringify(dbUser));
-                            localStorage.setItem('antigravity_user_role', dbUser.role);
-                        }
-                    } catch (e) { console.error("Profile refresh error", e); }
-                } else {
-                    setCurrentUserRole(currentRole);
-                    setAssignedOrderIds(assignedIds);
+            try {
+                // 1. Cargar Usuario
+                const loggedUserStr = localStorage.getItem('antigravity_logged_user');
+                if (loggedUserStr) {
+                    const loggedUser = JSON.parse(loggedUserStr);
+                    setCurrentUserRole(loggedUser.role);
+                    setAssignedOrderIds(loggedUser.assignedOrderIds || []);
                 }
-            }
 
-            // 2. Cargar datos locales (Inmediato para mejor UX)
-            const savedOrders = localStorage.getItem('antigravity_orders');
-            const savedVouchers = localStorage.getItem('antigravity_vouchers');
-            const savedExpenses = localStorage.getItem('antigravity_expenses');
+                // 2. Cargar Local
+                const localO = localStorage.getItem('antigravity_orders');
+                const localV = localStorage.getItem('antigravity_vouchers');
+                if (localO) setOrders(JSON.parse(localO));
+                if (localV) setVouchers(JSON.parse(localV));
 
-            if (savedOrders) setOrders(JSON.parse(savedOrders));
-            if (savedVouchers) setVouchers(JSON.parse(savedVouchers));
-            if (savedExpenses) setExpenses(JSON.parse(savedExpenses));
+                // 3. Sincronizar Nube
+                if (supabase) {
+                    const { data: dbO } = await supabase.from('orders').select('*');
+                    const { data: dbV } = await supabase.from('vouchers').select('*');
 
-            // 3. Sincronizar con Nube
-            if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
-                try {
-                    // Helper para mapear snake_case a camelCase si es necesario
-                    const mapData = (data: any[]) => {
-                        return data.map(item => {
-                            const newItem = { ...item };
-                            // Mapeo común de vouchers
-                            if (item.order_id && !item.orderId) newItem.orderId = item.order_id;
-                            if (item.item_id && !item.itemId) newItem.itemId = item.item_id;
-                            if (item.voucher_no && !item.voucherNo) newItem.voucherNo = item.voucher_no;
-                            if (item.reported_by && !item.reportedBy) newItem.reportedBy = item.reported_by;
-                            if (item.photo_url && !item.photoUrl) newItem.photoUrl = item.photo_url;
-                            if (item.start_meter && !item.startMeter) newItem.startMeter = item.start_meter;
-                            if (item.end_meter && !item.endMeter) newItem.endMeter = item.end_meter;
-
-                            // Mapeo común de órdenes
-                            if (item.order_number && !item.orderNumber) newItem.orderNumber = item.order_number;
-                            if (item.notification_date && !item.notificationDate) newItem.notificationDate = item.notification_date;
-                            if (item.order_type && !item.type) newItem.type = item.order_type;
-
-                            return newItem;
-                        });
-                    };
-
-                    // Órdenes
-                    const { data: dbOrders } = await supabase.from('orders').select('*');
-                    if (dbOrders && dbOrders.length > 0) {
-                        const mappedOrders = mapData(dbOrders);
-                        setOrders(mappedOrders);
-                        localStorage.setItem('antigravity_orders', JSON.stringify(mappedOrders));
+                    if (dbO) {
+                        const mappedO = dbO.map(mapFromDb);
+                        setOrders(mappedO);
+                        localStorage.setItem('antigravity_orders', JSON.stringify(mappedO));
                     }
-
-                    // Vouchers (Sincronización robusta)
-                    const { data: dbVouchers } = await supabase.from('vouchers').select('*');
-                    if (dbVouchers) {
-                        const mappedVouchers = mapData(dbVouchers);
-                        console.log(`Cloud Sync: ${dbVouchers.length} vouchers fetched.`);
-
-                        if (mappedVouchers.length > 0) {
-                            setVouchers(mappedVouchers);
-                            localStorage.setItem('antigravity_vouchers', JSON.stringify(mappedVouchers));
-                        } else {
-                            const localVouchers = localStorage.getItem('antigravity_vouchers');
-                            if (localVouchers) setVouchers(JSON.parse(localVouchers));
-                        }
+                    if (dbV) {
+                        const mappedV = dbV.map(mapFromDb);
+                        setVouchers(mappedV);
+                        localStorage.setItem('antigravity_vouchers', JSON.stringify(mappedV));
                     }
-
-                    // Gastos
-                    const { data: dbExpenses } = await supabase.from('expenses').select('*');
-                    if (dbExpenses && dbExpenses.length > 0) {
-                        const mappedExpenses = mapData(dbExpenses);
-                        setExpenses(mappedExpenses);
-                        localStorage.setItem('antigravity_expenses', JSON.stringify(mappedExpenses));
-                    }
-                } catch (err) {
-                    console.error("Cloud Sync Error:", err);
                 }
-            } else if (!savedOrders) {
-                setOrders(INITIAL_ORDERS);
-                localStorage.setItem('antigravity_orders', JSON.stringify(INITIAL_ORDERS));
+            } catch (err) {
+                console.error("Sync error", err);
+            } finally {
+                setIsSyncing(false);
             }
-
-            setIsSyncing(false);
         };
-
         syncAppData();
     }, []);
 
@@ -375,30 +360,16 @@ const AdminOrders = () => {
     };
 
     const fetchVouchersForOrder = async (orderId: string) => {
-        if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) return;
-
+        if (!supabase) return;
         try {
-            // Consultamos usando 'order_id' que es el nombre real en la DB
             const { data: dbVouchers, error } = await supabase
                 .from('vouchers')
                 .select('*')
                 .eq('order_id', orderId);
 
             if (error) throw error;
-
-            if (dbVouchers && dbVouchers.length > 0) {
-                // Mapeo manual para asegurar compatibilidad con el resto del código
-                const mapped = dbVouchers.map(v => ({
-                    ...v,
-                    orderId: v.order_id || v.orderId,
-                    itemId: v.item_id || v.itemId,
-                    voucherNo: v.voucher_no || v.voucherNo,
-                    reportedBy: v.reported_by || v.reportedBy,
-                    photoUrl: v.photo_url || v.photoUrl,
-                    startMeter: v.start_meter || v.startMeter,
-                    endMeter: v.end_meter || v.endMeter
-                }));
-
+            if (dbVouchers) {
+                const mapped = dbVouchers.map(mapFromDb);
                 setVouchers(prev => {
                     const otherVouchers = prev.filter(v => v.orderId !== orderId);
                     const merged = [...otherVouchers, ...mapped];
@@ -407,7 +378,7 @@ const AdminOrders = () => {
                 });
             }
         } catch (err) {
-            console.error("Error fetching vouchers for order:", err);
+            console.error("Error al obtener vales:", err);
         }
     };
 
@@ -420,50 +391,24 @@ const AdminOrders = () => {
 
         setIsSyncing(true);
         try {
-            // 1. Sincronizar Órdenes (Limpieza estricta de campos)
+            // 1. Sincronizar Órdenes
             if (orders.length > 0) {
-                const cleanOrders = orders.map(o => ({
-                    id: o.id,
-                    orderNumber: o.orderNumber,
-                    type: o.type,
-                    description: o.description,
-                    client: o.client,
-                    notificationDate: o.notificationDate,
-                    startDate: o.startDate,
-                    endDate: o.endDate,
-                    totalAmount: o.totalAmount,
-                    status: o.status,
-                    progress: o.progress,
-                    items: o.items // Los items se guardan como JSONB en Supabase
-                }));
-                const { error: errO } = await supabase.from('orders').upsert(cleanOrders);
+                const dbOrders = orders.map(o => mapToDb(o, 'orders'));
+                const { error: errO } = await supabase.from('orders').upsert(dbOrders);
                 if (errO) throw errO;
             }
 
-            // 2. Sincronizar Vales (Limpieza ULTRA estricta para evitar errores de esquema)
+            // 2. Sincronizar Vales
             if (vouchers.length > 0) {
-                const cleanVouchers = vouchers.map(v => ({
-                    id: v.id,
-                    orderId: v.orderId,
-                    itemId: v.itemId,
-                    date: v.date,
-                    quantity: v.quantity,
-                    voucherNo: v.voucherNo,
-                    type: v.type,
-                    reportedBy: v.reportedBy,
-                    photoUrl: v.photoUrl
-                    // Eliminamos campos técnicos (activity, startMeter, endMeter) 
-                    // que están causando errores de 'column not found' en Supabase
-                }));
-                const { error: errV } = await supabase.from('vouchers').upsert(cleanVouchers);
+                const dbVouchers = vouchers.map(v => mapToDb(v, 'vouchers'));
+                const { error: errV } = await supabase.from('vouchers').upsert(dbVouchers);
                 if (errV) throw errV;
             }
 
-            alert("¡ÉXITO TOTAL! Los datos están ahora en la nube de Supabase. El usuario externo ya puede ver el avance.");
+            alert("¡ÉXITO TOTAL! Los datos están sincronizados en la nube. El Supervisor ya puede ver el avance real.");
         } catch (err: any) {
-            console.error("Error detallado de sincronización:", err);
-            const detail = err.message || err.details || String(err);
-            alert("Error al sincronizar: " + detail + "\n\nTip: Verifica que las columnas coincidan en Supabase.");
+            console.error("Error de sincronización:", err);
+            alert("Error al sincronizar: " + (err.message || String(err)));
         } finally {
             setIsSyncing(false);
         }

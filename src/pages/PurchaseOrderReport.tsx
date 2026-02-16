@@ -93,7 +93,7 @@ const PurchaseOrderReport = () => {
             quantity: parseFloat(formData.quantityDelivered),
             voucherNo: formData.voucherNo,
             type: 'PURCHASE',
-            reportedBy: 'Administrador', // Mock user
+            reportedBy: (JSON.parse(localStorage.getItem('antigravity_logged_user') || '{}')).name || 'Anónimo',
             photoUrl: preview || undefined
         };
 
@@ -107,14 +107,14 @@ const PurchaseOrderReport = () => {
             try {
                 const { error } = await supabase.from('vouchers').upsert({
                     id: newVoucher.id,
-                    orderId: newVoucher.orderId,
-                    itemId: newVoucher.itemId,
+                    order_id: newVoucher.orderId,
+                    item_id: newVoucher.itemId,
                     date: newVoucher.date,
                     quantity: newVoucher.quantity,
-                    voucherNo: newVoucher.voucherNo,
+                    voucher_no: newVoucher.voucherNo,
                     type: newVoucher.type,
-                    reportedBy: newVoucher.reportedBy,
-                    photoUrl: newVoucher.photoUrl
+                    reported_by: newVoucher.reportedBy,
+                    photo_url: newVoucher.photoUrl
                 });
                 if (error) console.warn("Aviso: Guardado local, pero error al subir a nube.", error);
             } catch (err) {
@@ -267,8 +267,8 @@ const PurchaseOrderReport = () => {
                             onClick={handleSubmit}
                             disabled={userRole === 'OBSERVER'}
                             className={`w-full flex items-center justify-center gap-2 py-4 shadow-xl mt-4 rounded-2xl font-bold uppercase tracking-widest transition-all ${userRole === 'OBSERVER'
-                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
-                                    : 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-500/10'
+                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
+                                : 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-500/10'
                                 }`}
                         >
                             <Send size={20} />

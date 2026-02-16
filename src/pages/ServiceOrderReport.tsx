@@ -99,7 +99,7 @@ const ServiceOrderReport = () => {
             quantity: quantity,
             voucherNo: formData.voucherNo,
             type: 'SERVICE',
-            reportedBy: 'Administrador', // Mock user
+            reportedBy: (JSON.parse(localStorage.getItem('antigravity_logged_user') || '{}')).name || 'Anónimo',
             photoUrl: preview || undefined,
             activity: formData.activity,
             startMeter: parseFloat(formData.startMeter),
@@ -117,14 +117,14 @@ const ServiceOrderReport = () => {
                 // Solo enviamos campos básicos para evitar errores de esquema
                 const { error } = await supabase.from('vouchers').upsert({
                     id: newVoucher.id,
-                    orderId: newVoucher.orderId,
-                    itemId: newVoucher.itemId,
+                    order_id: newVoucher.orderId, // Mapeo correcto a snake_case
+                    item_id: newVoucher.itemId,
                     date: newVoucher.date,
                     quantity: newVoucher.quantity,
-                    voucherNo: newVoucher.voucherNo,
+                    voucher_no: newVoucher.voucherNo,
                     type: newVoucher.type,
-                    reportedBy: newVoucher.reportedBy,
-                    photoUrl: newVoucher.photoUrl
+                    reported_by: newVoucher.reportedBy,
+                    photo_url: newVoucher.photoUrl
                 });
                 if (error) console.warn("Aviso: No se pudo subir a la nube, pero se guardó localmente.", error);
             } catch (err) {
@@ -304,8 +304,8 @@ const ServiceOrderReport = () => {
                             onClick={handleSubmit}
                             disabled={userRole === 'OBSERVER'}
                             className={`w-full flex items-center justify-center gap-2 py-4 shadow-xl mt-4 rounded-2xl font-bold uppercase tracking-widest transition-all ${userRole === 'OBSERVER'
-                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
-                                    : 'btn-primary shadow-primary/20'
+                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none'
+                                : 'btn-primary shadow-primary/20'
                                 }`}
                         >
                             <Save size={20} />
