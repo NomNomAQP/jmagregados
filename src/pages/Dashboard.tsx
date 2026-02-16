@@ -165,7 +165,6 @@ const Dashboard = () => {
                         <div className="p-3 bg-red-50 text-red-500 rounded-2xl">
                             <TrendingDown size={24} />
                         </div>
-                        <span className="text-xs font-black text-red-500 bg-red-50 px-2 py-1 rounded-lg">-12.5%</span>
                     </div>
                     <div className="mt-8">
                         <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest">Gastos Operativos</h3>
