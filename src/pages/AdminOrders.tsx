@@ -394,6 +394,7 @@ const AdminOrders = () => {
         }
     };
 
+    // Versión de sincronización: 1.0.5 - Limpieza de esquema estricta
     const forceSyncToCloud = async () => {
         if (currentUserRole !== 'ADMIN') {
             alert("Solo el administrador puede sincronizar datos con la nube.");
