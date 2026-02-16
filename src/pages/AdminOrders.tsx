@@ -91,6 +91,35 @@ const AdminOrders = () => {
             const loggedUserStr = localStorage.getItem('antigravity_logged_user');
             if (loggedUserStr) {
                 const loggedUser = JSON.parse(loggedUserStr);
+
+                // Intentar obtener info actualizada de Supabase
+                if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+                    try {
+                        let query = supabase.from('users').select('*');
+
+                        // Si tenemos ID, lo usamos por precisión
+                        if (loggedUser.id) {
+                            query = query.eq('id', loggedUser.id);
+                        } else {
+                            // Fallback para sesiones antiguas sin ID
+                            query = query.eq('name', loggedUser.name);
+                        }
+
+                        const { data: dbUser } = await query.single();
+
+                        if (dbUser) {
+                            setCurrentUserRole(dbUser.role);
+                            setAssignedOrderIds(dbUser.assignedOrderIds || []);
+                            localStorage.setItem('antigravity_logged_user', JSON.stringify(dbUser));
+                            localStorage.setItem('antigravity_user_role', dbUser.role);
+                            return;
+                        }
+                    } catch (err) {
+                        console.error("Error fetching updated user role:", err);
+                    }
+                }
+
+                // Fallback a localStorage si falla la red o no hay Supabase
                 setCurrentUserRole(loggedUser.role);
                 setAssignedOrderIds(loggedUser.assignedOrderIds || []);
             }
@@ -832,9 +861,35 @@ const AdminOrders = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
-                                    {orders
-                                        .filter(o => currentUserRole !== 'EXTERNAL' || assignedOrderIds.includes(o.id))
-                                        .map((order) => {
+                                    {(() => {
+                                        const filteredOrders = orders.filter(o =>
+                                            currentUserRole !== 'EXTERNAL' ||
+                                            (Array.isArray(assignedOrderIds) && assignedOrderIds.includes(o.id))
+                                        );
+
+                                        if (filteredOrders.length === 0) {
+                                            return (
+                                                <tr>
+                                                    <td colSpan={8} className="px-8 py-20 text-center text-slate-400">
+                                                        <div className="flex flex-col items-center gap-3">
+                                                            <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-300">
+                                                                <ClipboardList size={32} />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-slate-800 font-bold">No se encontraron órdenes</p>
+                                                                <p className="text-slate-500 text-sm">
+                                                                    {currentUserRole === 'EXTERNAL'
+                                                                        ? 'Aún no tienes órdenes asignadas para visualizar.'
+                                                                        : 'No hay órdenes registradas que coincidan con los filtros.'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        }
+
+                                        return filteredOrders.map((order) => {
                                             const orderVouchers = vouchers.filter(v => v.orderId === order.id);
                                             const totalDelivered = orderVouchers.reduce((sum, v) => sum + v.quantity, 0);
                                             const totalTarget = order.items.reduce((sum, i) => sum + i.quantity, 0);
@@ -989,7 +1044,8 @@ const AdminOrders = () => {
                                                     )}
                                                 </React.Fragment>
                                             );
-                                        })}
+                                        });
+                                    })()}
                                 </tbody>
                             </table>
                         </div>

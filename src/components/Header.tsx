@@ -5,6 +5,9 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
+    const loggedUserStr = localStorage.getItem('antigravity_logged_user');
+    const loggedUser = loggedUserStr ? JSON.parse(loggedUserStr) : null;
+
     return (
         <header className="h-20 flex items-center justify-between px-4 lg:px-8 bg-white/50 backdrop-blur-md sticky top-0 z-40 border-b border-slate-100">
             <div className="flex items-center gap-4 flex-1">
@@ -44,15 +47,18 @@ const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
                 <div className="flex items-center gap-3 cursor-pointer group">
                     <div className="text-right">
                         <h3 className="text-sm font-bold text-slate-800">
-                            {localStorage.getItem('antigravity_user_role') === 'OPERATOR' ? 'Operador' :
-                                localStorage.getItem('antigravity_user_role') === 'REPORTER' ? 'Reportador' : 'Administrador'}
+                            {loggedUser?.name || 'Administrador'}
                         </h3>
-                        <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Plan Premium</p>
+                        <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">
+                            {loggedUser?.role === 'ADMIN' ? 'Administrador' :
+                                loggedUser?.role === 'EXTERNAL' ? 'Cliente Externo' :
+                                    loggedUser?.role === 'OPERATOR' ? 'Operador' : 'Reportador'}
+                        </p>
                     </div>
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-primary to-primary-light p-[2px]">
                         <div className="w-full h-full rounded-[10px] bg-white flex items-center justify-center overflow-hidden">
                             <img
-                                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Bryan"
+                                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${loggedUser?.name || 'Bryan'}`}
                                 alt="Avatar"
                                 className="w-full h-full object-cover"
                             />
