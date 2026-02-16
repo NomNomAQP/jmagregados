@@ -402,54 +402,51 @@ const AdminOrders = () => {
 
         setIsSyncing(true);
         try {
-            // 1. Sincronizar Órdenes (Compatibilidad híbrida)
+            // 1. Sincronizar Órdenes (Limpieza estricta de campos)
             if (orders.length > 0) {
-                const safeOrders = orders.map(o => ({
-                    ...o,
-                    // Enviamos ambos formatos para asegurar compatibilidad
-                    order_number: o.orderNumber,
-                    notification_date: o.notificationDate,
-                    order_type: o.type,
-                    type: o.type
+                const cleanOrders = orders.map(o => ({
+                    id: o.id,
+                    orderNumber: o.orderNumber,
+                    type: o.type,
+                    description: o.description,
+                    client: o.client,
+                    notificationDate: o.notificationDate,
+                    startDate: o.startDate,
+                    endDate: o.endDate,
+                    totalAmount: o.totalAmount,
+                    status: o.status,
+                    progress: o.progress,
+                    items: o.items // Los items se guardan como JSONB en Supabase
                 }));
-                const { error: errO } = await supabase.from('orders').upsert(safeOrders);
+                const { error: errO } = await supabase.from('orders').upsert(cleanOrders);
                 if (errO) throw errO;
             }
 
-            // 2. Sincronizar Vales (Compatibilidad híbrida)
+            // 2. Sincronizar Vales (Limpieza estricta de campos)
             if (vouchers.length > 0) {
-                const safeVouchers = vouchers.map(v => ({
+                const cleanVouchers = vouchers.map(v => ({
                     id: v.id,
                     orderId: v.orderId,
-                    order_id: v.orderId, // Snake case fallback
                     itemId: v.itemId,
-                    item_id: v.itemId, // Snake case fallback
                     date: v.date,
                     quantity: v.quantity,
                     voucherNo: v.voucherNo,
-                    voucher_no: v.voucherNo, // Snake case fallback
                     type: v.type,
                     reportedBy: v.reportedBy,
-                    reported_by: v.reportedBy, // Snake case fallback
                     photoUrl: v.photoUrl,
-                    photo_url: v.photoUrl, // Snake case fallback
                     activity: v.activity,
                     startMeter: v.startMeter,
-                    start_meter: v.startMeter,
-                    endMeter: v.endMeter,
-                    end_meter: v.endMeter
+                    endMeter: v.endMeter
                 }));
-
-                const { error: errV } = await supabase.from('vouchers').upsert(safeVouchers);
+                const { error: errV } = await supabase.from('vouchers').upsert(cleanVouchers);
                 if (errV) throw errV;
             }
 
             alert("¡Sincronización Exitosa! Los datos se han subido correctamente. El usuario externo ya puede ver el avance actualizado.");
         } catch (err: any) {
             console.error("Error detallado de sincronización:", err);
-            // Captura de error más robusta
-            const detail = err.message || err.details || (err.hint ? `Tip: ${err.hint}` : String(err));
-            alert("Error al sincronizar: " + detail);
+            const detail = err.message || err.details || String(err);
+            alert("Error al sincronizar: " + detail + "\n\nTip: Verifica que las columnas coincidan en Supabase.");
         } finally {
             setIsSyncing(false);
         }
