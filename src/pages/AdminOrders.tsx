@@ -86,23 +86,44 @@ const AdminOrders = () => {
             // 3. Sincronizar con Nube
             if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
                 try {
+                    // Helper para mapear snake_case a camelCase si es necesario
+                    const mapData = (data: any[]) => {
+                        return data.map(item => {
+                            const newItem = { ...item };
+                            // Mapeo común de vouchers
+                            if (item.order_id && !item.orderId) newItem.orderId = item.order_id;
+                            if (item.item_id && !item.itemId) newItem.itemId = item.item_id;
+                            if (item.voucher_no && !item.voucherNo) newItem.voucherNo = item.voucher_no;
+                            if (item.reported_by && !item.reportedBy) newItem.reportedBy = item.reported_by;
+                            if (item.photo_url && !item.photoUrl) newItem.photoUrl = item.photo_url;
+                            if (item.start_meter && !item.startMeter) newItem.startMeter = item.start_meter;
+                            if (item.end_meter && !item.endMeter) newItem.endMeter = item.end_meter;
+
+                            // Mapeo común de órdenes
+                            if (item.order_number && !item.orderNumber) newItem.orderNumber = item.order_number;
+                            if (item.notification_date && !item.notificationDate) newItem.notificationDate = item.notification_date;
+                            if (item.order_type && !item.type) newItem.type = item.order_type;
+
+                            return newItem;
+                        });
+                    };
+
                     // Órdenes
                     const { data: dbOrders } = await supabase.from('orders').select('*');
                     if (dbOrders && dbOrders.length > 0) {
-                        setOrders(dbOrders);
-                        localStorage.setItem('antigravity_orders', JSON.stringify(dbOrders));
+                        const mappedOrders = mapData(dbOrders);
+                        setOrders(mappedOrders);
+                        localStorage.setItem('antigravity_orders', JSON.stringify(mappedOrders));
                     }
 
                     // Vouchers (Sincronización robusta)
                     const { data: dbVouchers } = await supabase.from('vouchers').select('*');
                     if (dbVouchers) {
-                        if (dbVouchers.length > 0) {
-                            // Si hay datos en la nube, los usamos
-                            setVouchers(dbVouchers);
-                            localStorage.setItem('antigravity_vouchers', JSON.stringify(dbVouchers));
+                        const mappedVouchers = mapData(dbVouchers);
+                        if (mappedVouchers.length > 0) {
+                            setVouchers(mappedVouchers);
+                            localStorage.setItem('antigravity_vouchers', JSON.stringify(mappedVouchers));
                         } else {
-                            // Si la nube está vacía (posible error de permisos o tabla nueva), 
-                            // intentamos mantener lo que hay en localStorage para no quedar en blanco
                             const localVouchers = localStorage.getItem('antigravity_vouchers');
                             if (localVouchers) setVouchers(JSON.parse(localVouchers));
                         }
@@ -111,8 +132,9 @@ const AdminOrders = () => {
                     // Gastos
                     const { data: dbExpenses } = await supabase.from('expenses').select('*');
                     if (dbExpenses && dbExpenses.length > 0) {
-                        setExpenses(dbExpenses);
-                        localStorage.setItem('antigravity_expenses', JSON.stringify(dbExpenses));
+                        const mappedExpenses = mapData(dbExpenses);
+                        setExpenses(mappedExpenses);
+                        localStorage.setItem('antigravity_expenses', JSON.stringify(mappedExpenses));
                     }
                 } catch (err) {
                     console.error("Cloud Sync Error:", err);
@@ -380,22 +402,54 @@ const AdminOrders = () => {
 
         setIsSyncing(true);
         try {
-            // Sincronizar Órdenes
+            // 1. Sincronizar Órdenes (Compatibilidad híbrida)
             if (orders.length > 0) {
-                const { error: errO } = await supabase.from('orders').upsert(orders);
+                const safeOrders = orders.map(o => ({
+                    ...o,
+                    // Enviamos ambos formatos para asegurar compatibilidad
+                    order_number: o.orderNumber,
+                    notification_date: o.notificationDate,
+                    order_type: o.type,
+                    type: o.type
+                }));
+                const { error: errO } = await supabase.from('orders').upsert(safeOrders);
                 if (errO) throw errO;
             }
 
-            // Sincronizar Vales
+            // 2. Sincronizar Vales (Compatibilidad híbrida)
             if (vouchers.length > 0) {
-                const { error: errV } = await supabase.from('vouchers').upsert(vouchers);
+                const safeVouchers = vouchers.map(v => ({
+                    id: v.id,
+                    orderId: v.orderId,
+                    order_id: v.orderId, // Snake case fallback
+                    itemId: v.itemId,
+                    item_id: v.itemId, // Snake case fallback
+                    date: v.date,
+                    quantity: v.quantity,
+                    voucherNo: v.voucherNo,
+                    voucher_no: v.voucherNo, // Snake case fallback
+                    type: v.type,
+                    reportedBy: v.reportedBy,
+                    reported_by: v.reportedBy, // Snake case fallback
+                    photoUrl: v.photoUrl,
+                    photo_url: v.photoUrl, // Snake case fallback
+                    activity: v.activity,
+                    startMeter: v.startMeter,
+                    start_meter: v.startMeter,
+                    endMeter: v.endMeter,
+                    end_meter: v.endMeter
+                }));
+
+                const { error: errV } = await supabase.from('vouchers').upsert(safeVouchers);
                 if (errV) throw errV;
             }
 
-            alert("¡Sincronización Exitosa! Los datos locales se han subido a la nube. El usuario externo ya debería poder visualizar el avance.");
-        } catch (err) {
-            console.error("Error en sincronización forzada:", err);
-            alert("Error al sincronizar: " + (err instanceof Error ? err.message : "Error desconocido"));
+            alert("¡Sincronización Exitosa! Los datos se han subido correctamente. El usuario externo ya puede ver el avance actualizado.");
+        } catch (err: any) {
+            console.error("Error detallado de sincronización:", err);
+            // Captura de error más robusta
+            const detail = err.message || err.details || (err.hint ? `Tip: ${err.hint}` : String(err));
+            alert("Error al sincronizar: " + detail);
         } finally {
             setIsSyncing(false);
         }
@@ -865,8 +919,8 @@ const AdminOrders = () => {
                             onClick={forceSyncToCloud}
                             disabled={isSyncing}
                             className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${isSyncing
-                                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                                    : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100 shadow-lg shadow-emerald-500/10'
+                                ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                                : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-100 shadow-lg shadow-emerald-500/10'
                                 }`}
                         >
                             {isSyncing ? (
