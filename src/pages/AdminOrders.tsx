@@ -9,6 +9,9 @@ import {
 import type { Order, OrderItem, Voucher } from '../types';
 import { getLimaDate, parseLimaDateString } from '../utils/dateUtils';
 import { supabase } from '../utils/supabase';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
 
 const AdminOrders = () => {
     const [view, setView] = useState<'LIST' | 'CREATE' | 'DETAIL'>('LIST');
@@ -473,7 +476,72 @@ const AdminOrders = () => {
         });
     };
 
+    const handleExportPDF = (order: Order, _orderVouchers: Voucher[]) => {
+        const doc = new jsPDF();
+        
+        // Encabezado
+        doc.setFontSize(18);
+        doc.text(`Reporte de Control: ${order.orderNumber}`, 14, 20);
+        
+        doc.setFontSize(11);
+        doc.text(`Entidad Solicitante: ${order.client}`, 14, 30);
+        doc.text(`Tipo de Orden: ${order.type === 'SERVICE' ? 'Servicio (OS)' : 'Compra (OC)'}`, 14, 36);
+        doc.text(`Fecha de Emisión del Reporte: ${new Date().toLocaleDateString()}`, 14, 42);
+
+        // Resumen de Ítems
+        doc.setFontSize(14);
+        doc.text('Resumen de Ítems / Materiales:', 14, 52);
+
+        const itemsData = order.items.map((item, index) => {
+            const itemVouchers = _orderVouchers.filter(v => v.itemId === item.id);
+            const delivered = itemVouchers.reduce((sum, v) => sum + Number(v.quantity || 0), 0);
+            const progress = item.quantity > 0 ? ((delivered / item.quantity) * 100).toFixed(1) : '0.0';
+            return [
+                (index + 1).toString(),
+                item.description,
+                `${item.quantity} ${item.unit}`,
+                `${delivered} ${item.unit}`,
+                `${progress}%`
+            ];
+        });
+
+        autoTable(doc, {
+            startY: 56,
+            head: [['#', 'Descripción', 'Meta Total', 'Entregado', 'Progreso']],
+            body: itemsData,
+            theme: 'striped',
+            styles: { fontSize: 9 }
+        });
+
+        // Detalle de Vales
+        const finalY = (doc as any).lastAutoTable.finalY || 60;
+        doc.setFontSize(14);
+        doc.text('Detalle de Reportes de Campo / Vales:', 14, finalY + 10);
+
+        const vouchersData = _orderVouchers.map((v) => {
+            const item = order.items.find(i => i.id === v.itemId);
+            return [
+                v.voucherNo || '-',
+                v.date || '-',
+                item?.description || '-',
+                `${v.quantity} ${item?.unit || ''}`,
+                v.reportedBy || 'Supabase / Default'
+            ];
+        });
+
+        autoTable(doc, {
+            startY: finalY + 14,
+            head: [['Nro Vale', 'Fecha', 'Ítem Asignado', 'Cantidad Entregada', 'Reportado Por']],
+            body: vouchersData.length > 0 ? vouchersData : [['-', '-', 'No hay reportes de vales registrados', '-', '-']],
+            theme: 'grid',
+            styles: { fontSize: 9 }
+        });
+
+        doc.save(`Reporte_Control_${order.orderNumber}.pdf`);
+    };
+
     // --------------------------------------------------------------------------
+
     // RENDER: ORDER DETAIL VIEW
     // --------------------------------------------------------------------------
     if (view === 'DETAIL' && selectedOrder) {
@@ -873,7 +941,10 @@ const AdminOrders = () => {
                                     );
                                 })()}
                             </div>
-                            <button className="w-full py-3 bg-white/10 text-white border border-white/20 rounded-2xl text-xs font-black hover:bg-white/20 transition-all uppercase tracking-widest">
+                            <button 
+                                onClick={() => handleExportPDF(selectedOrder, expenses.length > 0 ? orderVouchers : orderVouchers)} // Forzamos scope
+                                className="w-full py-3 bg-white/10 text-white border border-white/20 rounded-2xl text-xs font-black hover:bg-white/20 transition-all uppercase tracking-widest"
+                            >
                                 Exportar PDF de Control
                             </button>
                         </div>
