@@ -323,16 +323,36 @@ const AdminOrders = () => {
         }
     };
 
-    const handleDeleteVoucher = (voucherId: string) => {
+    const handleDeleteVoucher = async (voucherId: string) => {
         if (confirm('¿Está seguro de eliminar este vale?')) {
+            // Borrar de Supabase
+            if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+                try {
+                    await supabase.from('vouchers').delete().eq('id', voucherId);
+                } catch (err) {
+                    console.error("Cloud Delete Error:", err);
+                }
+            }
+
             const updatedVouchers = vouchers.filter(v => v.id !== voucherId);
             setVouchers(updatedVouchers);
             localStorage.setItem('antigravity_vouchers', JSON.stringify(updatedVouchers));
         }
     };
 
-    const handleUpdateVoucher = () => {
+    const handleUpdateVoucher = async () => {
         if (!editingVoucher) return;
+
+        // Actualizar en Supabase
+        if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+            try {
+                const dbVoucher = mapToDb(editingVoucher, 'vouchers');
+                await supabase.from('vouchers').upsert(dbVoucher);
+            } catch (err) {
+                console.error("Cloud Update Error:", err);
+            }
+        }
+
         const updatedVouchers = vouchers.map(v => v.id === editingVoucher.id ? editingVoucher : v);
         setVouchers(updatedVouchers);
         localStorage.setItem('antigravity_vouchers', JSON.stringify(updatedVouchers));
@@ -353,8 +373,17 @@ const AdminOrders = () => {
         }
     };
 
-    const handleDeleteSelectedVouchers = () => {
+    const handleDeleteSelectedVouchers = async () => {
         if (confirm(`¿Está seguro de eliminar los ${selectedVoucherIds.length} vales seleccionados?`)) {
+            // Borrar múltiples de Supabase
+            if (import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY) {
+                try {
+                    await supabase.from('vouchers').delete().in('id', selectedVoucherIds);
+                } catch (err) {
+                    console.error("Cloud Delete Múltiple Error:", err);
+                }
+            }
+
             const updatedVouchers = vouchers.filter(v => !selectedVoucherIds.includes(v.id));
             setVouchers(updatedVouchers);
             localStorage.setItem('antigravity_vouchers', JSON.stringify(updatedVouchers));
